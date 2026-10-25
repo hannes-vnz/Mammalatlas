@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Mammal Atlas · Photo Edition</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel-2: #1f2630; --border: #30363d;
+    --border-soft: #21262d; --text: #e6edf3; --text-dim: #7d8590; --accent: #f0b429;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; width: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+  
+  #app { display: flex; width: 100vw; height: 100vh; overflow: hidden; }
+  #filters { width: 320px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--border); overflow-y: auto; padding: 24px; z-index: 10; transition: transform 0.3s ease; }
+  main { flex-grow: 1; position: relative; overflow: hidden; }
+  #sidebar { width: 400px; flex-shrink: 0; background: var(--panel); border-left: 1px solid var(--border); overflow-y: auto; z-index: 10; transition: transform 0.3s ease; display: none; }
+  #app.sidebar-open #sidebar { display: block; }
+
+  #filters .header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  #filters .logo { color: var(--accent); font-size: 22px; }
+  #filters h1 { font-size: 18px; font-weight: 600; }
+  #filters .subtitle { font-size: 11px; color: var(--text-dim); margin-bottom: 28px; letter-spacing: 0.02em; }
+  
+  .filter-group { margin-bottom: 22px; }
+  .filter-group h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 10px; font-weight: 600; }
+  
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip-row.scrollable { max-height: 180px; overflow-y: auto; padding-right: 4px; }
+  .chip-row.scrollable::-webkit-scrollbar { width: 4px; }
+  .chip-row.scrollable::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .chip { background: transparent; border: 1px solid var(--border); color: var(--text-dim); padding: 5px 11px; border-radius: 14px; font-size: 11px; cursor: pointer; transition: all 0.15s; user-select: none; display: flex; align-items: center; gap: 6px; }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.active { background: var(--accent); color: #1a1207; border-color: var(--accent); font-weight: 600; }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+  
+  .search-box { width: 100%; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 6px; font-size: 13px; }
+  .search-box:focus { outline: none; border-color: var(--accent); }
+  
+  .stats { font-size: 11px; color: var(--text-dim); padding-top: 16px; border-top: 1px solid var(--border-soft); margin-top: 8px; }
+  .stats strong { color: var(--accent); font-size: 22px; display: block; font-weight: 600; }
+  #reset-btn { width: 100%; background: transparent; border: 1px solid var(--border); color: var(--text-dim); padding: 8px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-top: 12px; }
+  #reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  #map { width: 100%; height: 100%; background: var(--bg); }
+
+  .photo-marker { width: 44px; height: 44px; cursor: pointer; }
+  .marker-inner { width: 100%; height: 100%; border-radius: 50%; background: var(--panel-2); border: 2px solid var(--accent); overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.5); transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s, border-width 0.2s; }
+  .marker-inner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .marker-inner .placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 18px; background: var(--panel-2); }
+  .photo-marker:hover .marker-inner { transform: scale(1.2); border-color: #fff; box-shadow: 0 4px 16px rgba(240, 180, 41, 0.6); }
+  .photo-marker:hover { z-index: 1000 !important; }
+  .photo-marker.selected .marker-inner { transform: scale(1.3); border-color: #fff; border-width: 3px; box-shadow: 0 0 0 3px var(--accent), 0 4px 20px rgba(240, 180, 41, 0.8); }
+  .photo-marker.selected { z-index: 1001 !important; }
+  .photo-marker .status-dot { position: absolute; bottom: -2px; right: -2px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--bg); pointer-events: none; }
+
+  .sidebar-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; background: var(--panel); z-index: 5; }
+  .sidebar-header .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
+  .close-btn { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 20px; padding: 0 8px; border-radius: 4px; }
+  .close-btn:hover { background: var(--panel-2); color: var(--text); }
+  
+  .hero-image { width: 100%; height: 220px; background: var(--panel-2); background-size: cover; background-position: center; border-bottom: 1px solid var(--border-soft); position: relative; }
+  .hero-image::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 60%, var(--panel) 100%); }
+  .detail-content { padding: 16px 24px 32px; }
+  .common { font-size: 26px; font-weight: 700; margin-bottom: 4px; letter-spacing: -0.02em; }
+  .scientific { font-style: italic; color: var(--text-dim); margin-bottom: 18px; font-size: 14px; }
+  
+  .badge-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+  .badge { padding: 4px 9px; border-radius: 4px; font-size: 11px; font-weight: 600; background: var(--panel-2); color: var(--text-dim); }
+  .badge.taxonomy { color: var(--text); }
+  .status-badge { color: #1a1207; }
+  .badge.clickable { cursor: pointer; transition: all 0.2s; }
+  .badge.clickable:hover { background: var(--accent); color: #1a1207; transform: translateY(-1px); box-shadow: 0 2px 5px rgba(240,180,41,0.3); }
+
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+  .info-cell { background: var(--panel-2); padding: 12px; border-radius: 8px; border: 1px solid var(--border-soft); }
+  .info-cell .label { font-size: 10px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; font-weight: 600; }
+  .info-cell .value { font-size: 13px; }
+
+  #legend { position: absolute; bottom: 20px; right: 20px; background: rgba(22,27,34,0.92); backdrop-filter: blur(8px); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 11px; z-index: 5; }
+  #legend h4 { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 8px; font-weight: 600; }
+  #legend .item { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+  #legend .swatch { width: 14px; height: 10px; border-radius: 2px; }
+
+  #hint { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(22,27,34,0.92); backdrop-filter: blur(8px); border: 1px solid var(--border); border-radius: 20px; padding: 8px 16px; font-size: 12px; color: var(--text-dim); z-index: 5; transition: opacity 0.4s; pointer-events: none; }
+  #hint.hidden { opacity: 0; }
+  #hint .accent { color: var(--accent); }
+
+  #mobile-filter-btn { display: none; position: absolute; bottom: 20px; left: 20px; background: var(--accent); color: #1a1207; border: none; border-radius: 30px; padding: 12px 20px; font-size: 14px; font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 9; cursor: pointer; }
+  
+  #backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); z-index: 1000; opacity: 0; transition: opacity 0.3s; }
+  #backdrop.visible { display: block; opacity: 1; }
+
+  #loader { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; z-index: 2000; }
+  #loader .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  #loader .msg { color: var(--text-dim); font-size: 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (min-width: 901px) {
+    #backdrop { display: none !important; }
+  }
+
+  @media (max-width: 900px) {
+    #mobile-filter-btn { display: block; }
+    #hint { display: none; } 
+    #legend { display: none; } 
+
+    #filters { position: fixed; left: -320px; top: 0; bottom: 0; z-index: 1001; }
+    #filters.open { transform: translateX(320px); }
+
+    /* Bottom Sheet für Handys */
+    #sidebar { 
+      position: fixed; 
+      left: 0; 
+      right: 0; 
+      bottom: 0; 
+      top: auto; 
+      width: 100%; 
+      max-width: 100%; 
+      height: 45vh; /* Verdeckt nur knapp die halbe Karte unten */
+      border-left: none; 
+      border-top: 1px solid var(--border); 
+      border-radius: 20px 20px 0 0; 
+      transform: translateY(100%); 
+      z-index: 1001; 
+      display: block; 
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+    }
+    #app.sidebar-open #sidebar { transform: translateY(0); }
+    
+    #app { display: block; }
+    main { width: 100vw; height: 100vh; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="spinner"></div>
+  <div class="msg" id="loader-msg">Lade Kartenbibliothek…</div>
+</div>
+
+<div id="backdrop"></div>
+
+<div id="app" style="visibility:hidden">
+  
+  <aside id="filters">
+    <div class="header">
+      <span class="logo">◈</span>
+      <h1>Mammal Atlas</h1>
+    </div>
+    <p class="subtitle" id="species-count-label">LADE DATEN...</p>
+
+    <div class="filter-group">
+      <h3>Suche</h3>
+      <input type="text" class="search-box" id="search" placeholder="Name, Familie, Ordnung…" />
+    </div>
+    
+    <div class="filter-group">
+      <h3>Schutzstatus</h3>
+      <div class="chip-row" id="status-chips"></div>
+    </div>
+    
+    <div class="filter-group">
+      <h3>Ordnung</h3>
+      <div class="chip-row scrollable" id="order-chips"></div>
+    </div>
+    
+    <div class="filter-group">
+      <h3>Familie</h3>
+      <div class="chip-row scrollable" id="family-chips"></div>
+    </div>
+
+    <div class="stats"><strong id="visible-count">0</strong>Arten sichtbar</div>
+    <button id="reset-btn">Filter zurücksetzen</button>
+  </aside>
+
+  <main>
+    <div id="map"></div>
+    <button id="mobile-filter-btn">⚙️ Filter & Suche</button>
+    <div id="hint"><span class="accent">▸</span> Klicke auf ein Tier, um Verbreitung & Details zu sehen</div>
+    <div id="legend">
+      <h4>Schutzstatus</h4>
+      <div class="item"><span class="swatch" style="background:#4ade80"></span>Least Concern</div>
+      <div class="item"><span class="swatch" style="background:#a3e635"></span>Near Threatened</div>
+      <div class="item"><span class="swatch" style="background:#facc15"></span>Vulnerable</div>
+      <div class="item"><span class="swatch" style="background:#fb923c"></span>Endangered</div>
+      <div class="item"><span class="swatch" style="background:#ef4444"></span>Critically Endangered</div>
+    </div>
+  </main>
+
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <span class="label">Art-Profil</span>
+      <div class="header-actions">
+        <button class="close-btn" id="close-sidebar">✕</button>
+      </div>
+    </div>
+    <div class="species-detail" id="species-detail"></div>
+  </aside>
+</div>
+
+<script>
+const CDN_URLS = [
+  "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js",
+  "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
+];
+
+function loadScript(url) { return new Promise((res, rej) => { const s = document.createElement("script"); s.src = url; s.onload = () => res(); s.onerror = () => rej(); document.head.appendChild(s); }); }
+async function loadMapLibre() {
+  for (const url of CDN_URLS) { try { await loadScript(url); if (typeof maplibregl !== "undefined") return true; } catch(e) {} }
+  return false;
+}
+
+const STATUS_COLORS = { LC:"#4ade80", NT:"#a3e635", VU:"#facc15", EN:"#fb923c", CR:"#ef4444" };
+const STATUS_LABELS = { LC:"Least Concern", NT:"Near Threatened", VU:"Vulnerable", EN:"Endangered", CR:"Critically Endangered" };
+
+const TAXONOMY_LABELS = {
+  "RODENTIA": "Nagetiere", "CHIROPTERA": "Fledertiere", "PRIMATES": "Primaten",
+  "CARNIVORA": "Raubtiere", "CETARTIODACTYLA": "Paarhufer & Wale", "ARTIODACTYLA": "Paarhufer",
+  "CETACEA": "Wale", "EULIPOTYPHLA": "Insektenfresser", "SORICOMORPHA": "Spitzmäuse & Maulwürfe",
+  "ERINACEOMORPHA": "Igel", "AFROSORICIDA": "Tenrekartige", "DIPROTODONTIA": "Diprotodontia",
+  "DIDELPHIMORPHIA": "Beutelratten", "DASYUROMORPHIA": "Raubbeutlerartige", "PERAMELEMORPHIA": "Nasenbeutler",
+  "CINGULATA": "Gepanzerte Nebengelenktiere", "PILOSA": "Zahnarme", "PHOLIDOTA": "Schuppentiere",
+  "PERISSODACTYLA": "Unpaarhufer", "PROBOSCIDEA": "Rüsseltiere", "HYRACOIDEA": "Schliefer",
+  "SIRENIA": "Seekühe", "TUBULIDENTATA": "Erdferkel", "LAGOMORPHA": "Hasenartige",
+  "SCANDENTIA": "Spitzhörnchen", "MACROSCELIDEA": "Rüsselspringer", "MONOTREMATA": "Kloakentiere",
+  "DERMOPTERA": "Riesengleiter"
+};
+
+const state = { 
+  species: [], currentFilteredList: [], search:"", 
+  orders: new Set(), statuses: new Set(), families: new Set(),
+  selectedId: null 
+};
+
+const backdrop = document.getElementById('backdrop');
+const filtersPanel = document.getElementById('filters');
+const appContainer = document.getElementById('app');
+
+document.getElementById('mobile-filter-btn').addEventListener('click', () => {
+  filtersPanel.classList.add('open');
+  backdrop.classList.add('visible'); // Blur NUR fürs Filtermenü
+});
+
+backdrop.addEventListener('click', () => {
+  filtersPanel.classList.remove('open');
+  appContainer.classList.remove('sidebar-open');
+  backdrop.classList.remove('visible');
+});
+
+window.triggerSearch = function(term) {
+  if (!term || term.includes("Unbekannt")) return;
+  const searchBox = document.getElementById("search");
+  searchBox.value = term; 
+  state.search = term.toLowerCase(); 
+  
+  if (window.innerWidth <= 900) {
+    appContainer.classList.remove('sidebar-open');
+    filtersPanel.classList.add('open');
+    backdrop.classList.add('visible');
+  }
+  
+  applyFilters(); 
+};
+
+async function init() {
+  const loader = document.getElementById("loader");
+  const loaderMsg = document.getElementById("loader-msg");
+  
+  const ok = await loadMapLibre();
+  if (!ok) { loader.classList.add("error"); loaderMsg.textContent = "Konnte MapLibre nicht laden."; return; }
+
+  loaderMsg.textContent = "Lade Geodaten (Teil 1 & 2)...";
+  
+  try {
+    const fileNames = ['./data/species_part_1.txt', './data/species_part_2.txt'];
+    const fetchPromises = fileNames.map(file => 
+      fetch(file)
+        .then(res => { if (!res.ok) throw new Error("Datei fehlt"); return res.text(); })
+        .catch(err => { console.warn(`Fehler bei ${file}`, err); return ""; })
+    );
+
+    const textResults = await Promise.all(fetchPromises);
+    const parsedSpecies = [];
+    let idCounter = 1; 
+    
+    for (const text of textResults) {
+      if (!text) continue;
+      const lines = text.split('\n');
+      
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // Zurück zum 9-Spalten-Format, das funktioniert hat!
+        // 0: common, 1: sciName, 2: order, 3: family, 4: status, 5: img, 6: w, 7: l, 8: range
+        const col = line.split('\t');
+        
+        const coordString = col[8] || "";
+        const polygonStrings = coordString.split('*'); 
+        const multiPolygonCoords = [];
+        let firstLng = null; let firstLat = null;
+
+        for (const polyStr of polygonStrings) {
+          if (!polyStr) continue;
+          const coordPairs = polyStr.split(';');
+          const singlePolygon = [];
+          
+          for (const pair of coordPairs) {
+            if (!pair) continue;
+            const p = pair.split('|');
+            if (p.length >= 2) {
+              const lng = parseFloat(p[0]); const lat = parseFloat(p[1]);
+              if (!isNaN(lng) && !isNaN(lat)) {
+                 singlePolygon.push([lng, lat]);
+                 if (firstLng === null) { firstLng = lng; firstLat = lat; }
+              }
+            }
+          }
+          if (singlePolygon.length >= 3) { multiPolygonCoords.push([singlePolygon]); }
+        }
+
+        parsedSpecies.push({
+          id: idCounter.toString(),
+          common: col[0],
+          sciName: col[1],
+          order: col[2],
+          family: col[3],
+          status: col[4],
+          image_url: col[5],
+          weight: col[6],
+          lifespan: col[7],
+          range: multiPolygonCoords.length > 0 ? { type: "MultiPolygon", coordinates: multiPolygonCoords } : null,
+          lng: firstLng,
+          lat: firstLat
+        });
+        idCounter++;
+      }
+    }
+
+    state.species = parsedSpecies;
+    state.currentFilteredList = parsedSpecies;
+    document.getElementById("species-count-label").textContent = `PHOTO EDITION · ${state.species.length} ARTEN`;
+    
+  } catch (error) {
+    loader.classList.add("error"); loaderMsg.textContent = "Kritischer Fehler beim Laden der Datenbank."; console.error(error); return;
+  }
+
+  document.getElementById("app").style.visibility = "visible";
+
+  const map = new maplibregl.Map({
+    container: "map",
+    style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+    center: [10, 20], zoom: 1.8, maxZoom: 10, minZoom: 1
+  });
+  window._map = map;
+
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+  // Klick auf Karte schließt Sidebar & Filtermenü
+  map.on('click', () => {
+    deselectSpecies();
+    if (window.innerWidth <= 900) {
+      filtersPanel.classList.remove('open');
+    }
+  });
+
+  map.on("load", () => {
+    map.addSource("selected-range", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "range-fill", type: "fill", source: "selected-range",
+      paint: { "fill-color": ["get", "color"], "fill-opacity": ["interpolate", ["linear"], ["zoom"], 1, 0.15, 5, 0.3] } });
+    map.addLayer({ id: "range-line", type: "line", source: "selected-range",
+      paint: { "line-color": ["get", "color"], "line-width": 1.5, "line-opacity": 0.7, "line-dasharray": [2, 2] } });
+      
+    buildFilterChips();
+    renderMarkers();
+    applyFilters();
+    
+    loader.style.opacity = "0";
+    setTimeout(() => { loader.style.display = "none"; }, 500);
+  });
+
+  map.on("moveend", renderMarkers);
+  map.on("zoomend", renderMarkers);
+
+  document.getElementById("close-sidebar").onclick = deselectSpecies;
+  document.addEventListener("keydown", e => { if (e.key === "Escape") deselectSpecies(); });
+  document.getElementById("search").addEventListener("input", e => { state.search = e.target.value.toLowerCase(); applyFilters(); });
+  document.getElementById("reset-btn").onclick = () => {
+    state.search = ""; state.orders.clear(); state.statuses.clear(); state.families.clear();
+    document.getElementById("search").value = "";
+    document.querySelectorAll(".chip.active").forEach(c => c.classList.remove("active"));
+    applyFilters();
+  };
+}
+
+const activeMarkers = new Map();
+const MAX_MARKERS_ON_SCREEN = 300; 
+
+function renderMarkers() {
+  if (!window._map) return;
+  const bounds = window._map.getBounds();
+  
+  let visibleSpecies = state.currentFilteredList.filter(sp => {
+    if (sp.lng === null || sp.lat === null) return false; 
+    return bounds.contains([sp.lng, sp.lat]);
+  });
+
+  visibleSpecies.sort((a, b) => {
+    if (a.image_url && !b.image_url) return -1;
+    if (!a.image_url && b.image_url) return 1;
+    return 0; 
+  });
+
+  visibleSpecies = visibleSpecies.slice(0, MAX_MARKERS_ON_SCREEN);
+  const visibleIds = new Set(visibleSpecies.map(sp => sp.id));
+
+  for (let [id, markerObj] of activeMarkers) {
+    if (!visibleIds.has(id)) {
+      markerObj.marker.remove(); 
+      activeMarkers.delete(id);  
+    }
+  }
+
+  visibleSpecies.forEach(sp => {
+    if (!activeMarkers.has(sp.id)) {
+      const el = document.createElement("div");
+      el.className = "photo-marker";
+      if (state.selectedId === sp.id) el.classList.add("selected");
+      el.dataset.id = sp.id;
+      
+      const inner = document.createElement("div");
+      inner.className = "marker-inner";
+      
+      if (sp.image_url && sp.image_url.startsWith('http')) {
+        const img = document.createElement("img");
+        img.src = sp.image_url;
+        img.loading = "lazy"; 
+        img.onerror = () => { inner.innerHTML = '<div class="placeholder">🐾</div>'; };
+        inner.appendChild(img);
+      } else {
+        inner.innerHTML = '<div class="placeholder">🐾</div>';
+      }
+      
+      const statusDot = document.createElement("div");
+      statusDot.className = "status-dot";
+      statusDot.style.background = STATUS_COLORS[sp.status] || '#888';
+      
+      el.appendChild(inner);
+      el.appendChild(statusDot);
+      
+      el.addEventListener("click", e => { 
+        e.stopPropagation(); 
+        selectSpecies(sp.id); 
+      });
+
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([sp.lng, sp.lat])
+        .addTo(window._map);
+        
+      activeMarkers.set(sp.id, { marker, el, species: sp });
+    }
+  });
+}
+
+function selectSpecies(id) {
+  const sp = state.species.find(s => s.id === id);
+  if (!sp) return;
+  state.selectedId = id;
+  
+  activeMarkers.forEach((m, mid) => m.el.classList.toggle("selected", mid === id));
+
+  window._map.getSource("selected-range").setData({
+    type: "FeatureCollection",
+    features: sp.range ? [{ type: "Feature", properties: { color: STATUS_COLORS[sp.status] || "#888" }, geometry: sp.range }] : []
+  });
+
+  if (window.innerWidth <= 900) {
+    filtersPanel.classList.remove('open');
+    backdrop.classList.remove('visible'); // WICHTIG: KEIN Backdrop hier, Karte bleibt klar!
+  }
+
+  appContainer.classList.add("sidebar-open");
+  showSpeciesDetail(sp);
+  document.getElementById("hint").classList.add("hidden");
+
+  if(sp.lat && sp.lng) { 
+     const isMobile = window.innerWidth <= 900;
+     window._map.flyTo({ 
+       center: [sp.lng, sp.lat], 
+       zoom: isMobile ? 2 : 3, 
+       padding: isMobile ? { bottom: window.innerHeight * 0.45 } : { right: 400 },
+       duration: 800 
+     });
+  }
+}
+
+function deselectSpecies() {
+  state.selectedId = null;
+  activeMarkers.forEach(m => m.el.classList.remove("selected"));
+  window._map.getSource("selected-range").setData({ type:"FeatureCollection", features:[] });
+  appContainer.classList.remove("sidebar-open");
+  backdrop.classList.remove('visible');
+}
+
+function unique(arr) { return Array.from(new Set(arr)).sort(); }
+
+function buildFilterChips() {
+  const make = (id, items, key, withDot=false) => {
+    const c = document.getElementById(id); c.innerHTML = "";
+    items.forEach(val => {
+      if (!val || val === "Unbekannt" || val === "") return; 
+      const chip = document.createElement("div"); chip.className = "chip";
+      
+      let label = val;
+      if (key === "orders" && typeof val === 'string' && TAXONOMY_LABELS[val.toUpperCase()]) {
+        label = `${val} (${TAXONOMY_LABELS[val.toUpperCase()]})`;
+      }
+
+      if (withDot && STATUS_COLORS[val]) chip.innerHTML = `<span class="dot" style="background:${STATUS_COLORS[val]}"></span>${label}`;
+      else chip.textContent = label;
+      
+      chip.onclick = () => { if (state[key].has(val)) state[key].delete(val); else state[key].add(val); chip.classList.toggle("active"); applyFilters(); };
+      c.appendChild(chip);
+    });
+  };
+  
+  make("order-chips", unique(state.species.map(s => s.order).filter(Boolean)), "orders");
+  make("family-chips", unique(state.species.map(s => s.family).filter(Boolean)), "families");
+  make("status-chips", ["LC","NT","VU","EN","CR"].filter(s => state.species.some(sp => sp.status === s)), "statuses", true);
+}
+
+function applyFilters() {
+  state.currentFilteredList = state.species.filter(s => {
+    const searchTerm = (state.search || "").toLowerCase().trim();
+    
+    const cName = (s.common || "").toLowerCase();
+    const sName = (s.sciName || "").toLowerCase();
+    const fName = (s.family || "").toLowerCase(); 
+    const oName = (s.order || "").toLowerCase();  
+    
+    const okSearch = (!searchTerm || 
+                      cName.includes(searchTerm) || 
+                      sName.includes(searchTerm) || 
+                      fName.includes(searchTerm) || 
+                      oName.includes(searchTerm));
+                      
+    const okOrder = (!state.orders.size || state.orders.has(s.order));
+    const okFamily = (!state.families.size || state.families.has(s.family));
+    const okStatus = (!state.statuses.size || state.statuses.has(s.status));
+    
+    return okSearch && okOrder && okFamily && okStatus;
+  });
+
+  document.getElementById("visible-count").textContent = state.currentFilteredList.length;
+  renderMarkers();
+  
+  if (state.selectedId) { 
+    const isStillVisible = state.currentFilteredList.some(s => s.id === state.selectedId);
+    if (!isStillVisible) deselectSpecies(); 
+  }
+}
+
+function showSpeciesDetail(sp) {
+  const el = document.getElementById("species-detail");
+  
+  const bgStyle = sp.image_url ? `background-image: url('${sp.image_url}');` : '';
+  const orderName = sp.order ? sp.order.toUpperCase() : '';
+  const readableOrder = TAXONOMY_LABELS[orderName] ? `${sp.order} (${TAXONOMY_LABELS[orderName]})` : (sp.order || 'Unbekannt');
+
+  el.innerHTML = `
+    <div class="hero-image" id="hero-image" style="${bgStyle}"></div>
+    <div class="detail-content">
+      <div class="common">${sp.common || "Unbekannt"}</div>
+      <div class="scientific">${sp.sciName || ""}</div>
+      <div class="badge-row">
+        <span class="badge status-badge" style="background:${STATUS_COLORS[sp.status] || '#888'}">${sp.status} · ${STATUS_LABELS[sp.status] || 'Unknown'}</span>
+        <span class="badge taxonomy clickable" onclick="triggerSearch('${sp.order}')">${readableOrder}</span>
+        <span class="badge taxonomy clickable" onclick="triggerSearch('${sp.family}')">${sp.family || 'Familie Unbekannt'}</span>
+      </div>
+      <div class="info-grid">
+        <div class="info-cell"><div class="label">Gewicht</div><div class="value">${sp.weight || '? kg'}</div></div>
+        <div class="info-cell"><div class="label">Alter</div><div class="value">${sp.lifespan || '? J.'}</div></div>
+      </div>
+    </div>`;
+}
+
+init();
+</script>
+</body>
+</html>

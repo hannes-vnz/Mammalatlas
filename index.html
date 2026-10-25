@@ -4,6 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Mammal Atlas · Photo Edition</title>
+<meta name="description" content="Interaktiver Weltatlas der Säugetiere: Verbreitungsgebiete von über 5.400 Arten, filterbar nach Ordnung, Familie und Schutzstatus." />
+<meta property="og:title" content="Mammal Atlas · Photo Edition" />
+<meta property="og:description" content="Interaktiver Weltatlas der Säugetiere mit Verbreitungsgebieten und IUCN-Schutzstatus." />
+<meta property="og:type" content="website" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%BE%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
 <style>
   :root {
@@ -98,6 +103,15 @@
   #loader .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
   #loader .msg { color: var(--text-dim); font-size: 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  #loader.error .spinner { display: none; }
+  #loader.error .msg { color: #ef4444; max-width: 440px; text-align: center; padding: 0 20px; line-height: 1.6; font-size: 13px; }
+  #loader.error code { background: var(--panel-2); padding: 2px 6px; border-radius: 4px; color: var(--text); }
+  .nav-link { display: block; text-align: center; margin-top: 10px; padding: 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--accent); font-size: 12px; text-decoration: none; }
+  .nav-link:hover { border-color: var(--accent); }
+  .credits { font-size: 10px; line-height: 1.6; color: var(--text-dim); margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border-soft); }
+  .credits a, .img-credit a { color: var(--text-dim); text-decoration: underline; }
+  .credits a:hover, .img-credit a:hover { color: var(--accent); }
+  .img-credit { font-size: 10px; color: var(--text-dim); margin: -12px 0 18px; }
 
   @media (min-width: 901px) {
     #backdrop { display: none !important; }
@@ -176,6 +190,14 @@
 
     <div class="stats"><strong id="visible-count">0</strong>Arten sichtbar</div>
     <button id="reset-btn">Filter zurücksetzen</button>
+
+    <a class="nav-link" href="insights.html">📊 Insights &amp; Hotspots →</a>
+
+    <div class="credits">
+      Karte: © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap-Mitwirkende</a><br>
+      Bilder: Wikimedia Commons, Lizenz und Urheber stehen im jeweiligen Art-Profil.
+      <!-- TODO: Quelle und Lizenz der Verbreitungsdaten und des Schutzstatus hier ergänzen -->
+    </div>
   </aside>
 
   <main>
@@ -189,6 +211,9 @@
       <div class="item"><span class="swatch" style="background:#facc15"></span>Vulnerable</div>
       <div class="item"><span class="swatch" style="background:#fb923c"></span>Endangered</div>
       <div class="item"><span class="swatch" style="background:#ef4444"></span>Critically Endangered</div>
+      <div class="item"><span class="swatch" style="background:#c084fc"></span>Extinct in the Wild</div>
+      <div class="item"><span class="swatch" style="background:#f5f5f5"></span>Extinct</div>
+      <div class="item"><span class="swatch" style="background:#94a3b8"></span>Data Deficient</div>
     </div>
   </main>
 
@@ -215,8 +240,8 @@ async function loadMapLibre() {
   return false;
 }
 
-const STATUS_COLORS = { LC:"#4ade80", NT:"#a3e635", VU:"#facc15", EN:"#fb923c", CR:"#ef4444" };
-const STATUS_LABELS = { LC:"Least Concern", NT:"Near Threatened", VU:"Vulnerable", EN:"Endangered", CR:"Critically Endangered" };
+const STATUS_COLORS = { LC:"#4ade80", NT:"#a3e635", VU:"#facc15", EN:"#fb923c", CR:"#ef4444", EW:"#c084fc", EX:"#f5f5f5", DD:"#94a3b8" };
+const STATUS_LABELS = { LC:"Least Concern", NT:"Near Threatened", VU:"Vulnerable", EN:"Endangered", CR:"Critically Endangered", EW:"Extinct in the Wild", EX:"Extinct", DD:"Data Deficient" };
 
 const TAXONOMY_LABELS = {
   "RODENTIA": "Nagetiere", "CHIROPTERA": "Fledertiere", "PRIMATES": "Primaten",
@@ -228,8 +253,214 @@ const TAXONOMY_LABELS = {
   "PERISSODACTYLA": "Unpaarhufer", "PROBOSCIDEA": "Rüsseltiere", "HYRACOIDEA": "Schliefer",
   "SIRENIA": "Seekühe", "TUBULIDENTATA": "Erdferkel", "LAGOMORPHA": "Hasenartige",
   "SCANDENTIA": "Spitzhörnchen", "MACROSCELIDEA": "Rüsselspringer", "MONOTREMATA": "Kloakentiere",
-  "DERMOPTERA": "Riesengleiter"
+  "DERMOPTERA": "Riesengleiter", "MICROBIOTHERIA": "Chile-Opossums", "NOTORYCTEMORPHIA": "Beutelmulle",
+  "PAUCITUBERCULATA": "Chile-Beutelratten"
 };
+
+/* ATLAS-CORE-START: reine Funktionen (ohne DOM), siehe README */
+// Prioritaet beim Darstellen: echtes Foto zuerst, dann Gefaehrdung
+const SEVERITY = { CR: 7, EN: 6, VU: 5, NT: 4, EW: 3, LC: 2, DD: 1, EX: 0 };
+
+// "lng|lat;lng|lat*..." -> { rings: Float64Array[], boxes: [minX,minY,maxX,maxY][], bbox }
+function parseRange(str) {
+  if (!str) return null;
+  const rings = [], boxes = [];
+  let gx0 = Infinity, gy0 = Infinity, gx1 = -Infinity, gy1 = -Infinity;
+  for (const polyStr of str.split("*")) {
+    if (!polyStr) continue;
+    const buf = [];
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const pair of polyStr.split(";")) {
+      const i = pair.indexOf("|");
+      if (i < 0) continue;
+      const x = parseFloat(pair.slice(0, i)), y = parseFloat(pair.slice(i + 1));
+      if (isNaN(x) || isNaN(y)) continue;
+      buf.push(x, y);
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    if (buf.length < 6) continue;
+    rings.push(Float64Array.from(buf));
+    boxes.push([x0, y0, x1, y1]);
+    if (x0 < gx0) gx0 = x0; if (x1 > gx1) gx1 = x1;
+    if (y0 < gy0) gy0 = y0; if (y1 > gy1) gy1 = y1;
+  }
+  return rings.length ? { rings, boxes, bbox: [gx0, gy0, gx1, gy1] } : null;
+}
+
+function pointInRing(x, y, ring) {
+  let inside = false;
+  const n = ring.length;
+  for (let i = 0, j = n - 2; i < n; j = i, i += 2) {
+    const xi = ring[i], yi = ring[i + 1], xj = ring[j], yj = ring[j + 1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+// Schwerpunkt (Shoelace) mit Flaeche
+function ringCentroid(ring) {
+  let a = 0, cx = 0, cy = 0;
+  const n = ring.length;
+  for (let i = 0, j = n - 2; i < n; j = i, i += 2) {
+    const f = ring[j] * ring[i + 1] - ring[i] * ring[j + 1];
+    a += f; cx += (ring[j] + ring[i]) * f; cy += (ring[j + 1] + ring[i + 1]) * f;
+  }
+  if (Math.abs(a) < 1e-12) {
+    let sx = 0, sy = 0;
+    for (let i = 0; i < n; i += 2) { sx += ring[i]; sy += ring[i + 1]; }
+    return { x: sx / (n / 2), y: sy / (n / 2), area: 0 };
+  }
+  return { x: cx / (3 * a), y: cy / (3 * a), area: Math.abs(a) / 2 };
+}
+
+// Ein Punkt innerhalb des Rings und der Box [x0,y0,x1,y1] (grobes Raster), sonst null
+function findInside(ring, x0, y0, x1, y1) {
+  const tries = [[.5, .5], [.25, .25], [.75, .25], [.25, .75], [.75, .75], [.5, .25], [.5, .75], [.25, .5], [.75, .5]];
+  for (const t of tries) {
+    const x = x0 + (x1 - x0) * t[0], y = y0 + (y1 - y0) * t[1];
+    if (pointInRing(x, y, ring)) return [x, y];
+  }
+  for (let i = 1; i < 8; i++) for (let j = 1; j < 8; j++) {
+    const x = x0 + (x1 - x0) * i / 8, y = y0 + (y1 - y0) * j / 8;
+    if (pointInRing(x, y, ring)) return [x, y];
+  }
+  return null;
+}
+
+// Fester Standard-Ankerpunkt: Schwerpunkt des groessten Polygons (liegt er nicht darin, ein Punkt darin)
+function globalAnchor(range) {
+  let best = -1, bestArea = -1, bestC = null;
+  for (let i = 0; i < range.rings.length; i++) {
+    const c = ringCentroid(range.rings[i]);
+    if (c.area > bestArea) { bestArea = c.area; best = i; bestC = c; }
+  }
+  const ring = range.rings[best];
+  if (pointInRing(bestC.x, bestC.y, ring)) return [bestC.x, bestC.y];
+  const b = range.boxes[best];
+  return findInside(ring, b[0], b[1], b[2], b[3]) || [ring[0], ring[1]];
+}
+
+function boxesIntersect(a, b) { return a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1]; }
+function inBox(p, b) { return p[0] >= b[0] && p[0] <= b[2] && p[1] >= b[1] && p[1] <= b[3]; }
+
+// Ankerpunkt, der im sichtbaren Ausschnitt view=[w,s,e,n] UND im Verbreitungsgebiet liegt
+function viewAnchor(range, view) {
+  const cands = [];
+  for (let i = 0; i < range.boxes.length; i++) {
+    const b = range.boxes[i];
+    if (!boxesIntersect(b, view)) continue;
+    const ix = [Math.max(b[0], view[0]), Math.max(b[1], view[1]), Math.min(b[2], view[2]), Math.min(b[3], view[3])];
+    cands.push({ i, ix, area: (ix[2] - ix[0]) * (ix[3] - ix[1]) });
+  }
+  cands.sort((p, q) => q.area - p.area);
+  for (const c of cands.slice(0, 6)) {
+    const p = findInside(range.rings[c.i], c.ix[0], c.ix[1], c.ix[2], c.ix[3]);
+    if (p) return p;
+  }
+  // Notloesung: erster Eckpunkt im Ausschnitt (duenne oder winzige Gebiete)
+  for (const c of cands) {
+    const r = range.rings[c.i];
+    for (let k = 0; k < r.length; k += 2) if (inBox([r[k], r[k + 1]], view)) return [r[k], r[k + 1]];
+  }
+  return null;
+}
+
+// Waehlt Marker fuer den aktuellen Ausschnitt. list ist nach Prioritaet sortiert.
+// project(lng,lat) -> [px,py]; opts: { cap, minDist, forceId }
+function pickMarkers(list, view, project, opts) {
+  const cap = opts.cap || 300, minDist = opts.minDist || 50, d2 = minDist * minDist;
+  const grid = new Map(), out = [];
+  const free = (px, py) => {
+    const cx = Math.floor(px / minDist), cy = Math.floor(py / minDist);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      const cell = grid.get((cx + dx) + "," + (cy + dy));
+      if (cell) for (const q of cell) { const ex = q[0] - px, ey = q[1] - py; if (ex * ex + ey * ey < d2) return false; }
+    }
+    return true;
+  };
+  const place = (sp, pos) => {
+    const p = project(pos[0], pos[1]);
+    if (!free(p[0], p[1])) return false;
+    const key = Math.floor(p[0] / minDist) + "," + Math.floor(p[1] / minDist);
+    if (!grid.has(key)) grid.set(key, []);
+    grid.get(key).push(p);
+    out.push({ sp, lng: pos[0], lat: pos[1] });
+    return true;
+  };
+  const resolve = sp => {
+    if (!sp.range || !boxesIntersect(sp.range.bbox, view)) return null;
+    if (sp.anchor && inBox(sp.anchor, view)) return sp.anchor;
+    return viewAnchor(sp.range, view);
+  };
+  if (opts.forceId != null) {
+    const f = list.find(s => s.id === opts.forceId);
+    if (f) { const pos = resolve(f); if (pos) place(f, pos); }
+  }
+  for (const sp of list) {
+    if (out.length >= cap) break;
+    if (sp.id === opts.forceId) continue;
+    const pos = resolve(sp);
+    if (pos) place(sp, pos);
+  }
+  return out;
+}
+
+// Artenvielfalt als Raster (Scanline-Fuellung je Polygon, jede Art zaehlt je Zelle einmal)
+// species: [{range, ...}], cell in Grad, pass: Funktion(sp) -> bool; Gebiete >180 Grad Breite werden ausgelassen
+function richnessGrid(species, cell, pass) {
+  const W = Math.round(360 / cell), H = Math.round(180 / cell);
+  const counts = new Uint16Array(W * H), stamp = new Int32Array(W * H);
+  let sid = 0, skipped = 0;
+  for (const sp of species) {
+    if (!sp.range || (pass && !pass(sp))) continue;
+    sid++;
+    for (let r = 0; r < sp.range.rings.length; r++) {
+      const ring = sp.range.rings[r], b = sp.range.boxes[r];
+      if (b[2] - b[0] > 180) { skipped++; continue; }
+      const mark = (i, j) => {
+        if (i < 0 || i >= W || j < 0 || j >= H) return;
+        const k = j * W + i;
+        if (stamp[k] !== sid) { stamp[k] = sid; counts[k]++; }
+      };
+      const j0 = Math.max(0, Math.floor((b[1] + 90) / cell)), j1 = Math.min(H - 1, Math.floor((b[3] + 90) / cell));
+      const rows = new Array(j1 - j0 + 1);
+      for (let i = 0; i < rows.length; i++) rows[i] = [];
+      const n = ring.length;
+      for (let a = 0, p = n - 2; a < n; p = a, a += 2) {
+        const xa = ring[p], ya = ring[p + 1], xb = ring[a], yb = ring[a + 1];
+        mark(Math.floor((xb + 180) / cell), Math.floor((yb + 90) / cell));
+        if (ya === yb) continue;
+        const lo = Math.min(ya, yb), hi = Math.max(ya, yb);
+        const jStart = Math.max(j0, Math.ceil((lo + 90) / cell - 0.5)), jEnd = Math.min(j1, Math.ceil((hi + 90) / cell - 0.5) - 1);
+        for (let j = jStart; j <= jEnd; j++) {
+          const yc = -90 + (j + 0.5) * cell;
+          rows[j - j0].push(xa + (xb - xa) * (yc - ya) / (yb - ya));
+        }
+      }
+      for (let i = 0; i < rows.length; i++) {
+        const xs = rows[i].sort((u, v) => u - v);
+        for (let m = 0; m + 1 < xs.length; m += 2) {
+          const iStart = Math.ceil((xs[m] + 180) / cell - 0.5), iEnd = Math.ceil((xs[m + 1] + 180) / cell - 0.5) - 1;
+          for (let ii = iStart; ii <= iEnd; ii++) mark(ii, j0 + i);
+        }
+      }
+    }
+  }
+  return { counts, W, H, cell, skipped };
+}
+/* ATLAS-CORE-END */
+
+function esc(v) {
+  return String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+// Viele Datensätze enthalten statt eines Tierfotos nur das IUCN-Statussymbol aus der Wikipedia-Infobox.
+function isPhoto(url) { return !!url && url.startsWith("https://") && !/Status_iucn/i.test(url); }
+function commonsPage(url) {
+  const m = /upload\.wikimedia\.org\/wikipedia\/([a-z-]+)\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^\/?#]+)/.exec(url || "");
+  if (!m) return null;
+  return m[1] === "commons" ? `https://commons.wikimedia.org/wiki/File:${m[2]}` : `https://${m[1]}.wikipedia.org/wiki/File:${m[2]}`;
+}
 
 const state = { 
   species: [], currentFilteredList: [], search:"", 
@@ -272,7 +503,7 @@ async function init() {
   const loaderMsg = document.getElementById("loader-msg");
   
   const ok = await loadMapLibre();
-  if (!ok) { loader.classList.add("error"); loaderMsg.textContent = "Konnte MapLibre nicht laden."; return; }
+  if (!ok) { loader.classList.add("error"); loaderMsg.textContent = "Konnte die Kartenbibliothek nicht laden. Bitte Internetverbindung prüfen."; return; }
 
   loaderMsg.textContent = "Lade Geodaten (Teil 1 & 2)...";
   
@@ -285,6 +516,12 @@ async function init() {
     );
 
     const textResults = await Promise.all(fetchPromises);
+    const failedParts = textResults.filter(t => !t).length;
+    if (failedParts === textResults.length) {
+      loader.classList.add("error");
+      loaderMsg.innerHTML = 'Die Artendaten konnten nicht geladen werden.<br>Bitte über einen Webserver öffnen, z. B. <code>python -m http.server</code>, nicht direkt per Doppelklick.';
+      return;
+    }
     const parsedSpecies = [];
     let idCounter = 1; 
     
@@ -300,51 +537,35 @@ async function init() {
         // 0: common, 1: sciName, 2: order, 3: family, 4: status, 5: img, 6: w, 7: l, 8: range
         const col = line.split('\t');
         
-        const coordString = col[8] || "";
-        const polygonStrings = coordString.split('*'); 
-        const multiPolygonCoords = [];
-        let firstLng = null; let firstLat = null;
-
-        for (const polyStr of polygonStrings) {
-          if (!polyStr) continue;
-          const coordPairs = polyStr.split(';');
-          const singlePolygon = [];
-          
-          for (const pair of coordPairs) {
-            if (!pair) continue;
-            const p = pair.split('|');
-            if (p.length >= 2) {
-              const lng = parseFloat(p[0]); const lat = parseFloat(p[1]);
-              if (!isNaN(lng) && !isNaN(lat)) {
-                 singlePolygon.push([lng, lat]);
-                 if (firstLng === null) { firstLng = lng; firstLat = lat; }
-              }
-            }
-          }
-          if (singlePolygon.length >= 3) { multiPolygonCoords.push([singlePolygon]); }
-        }
+        const range = parseRange(col[8]);
+        const anchor = range ? globalAnchor(range) : null;
 
         parsedSpecies.push({
           id: idCounter.toString(),
           common: col[0],
-          sciName: col[1],
+          sciName: (col[1] || "").replace(/_/g, " "),
           order: col[2],
           family: col[3],
           status: col[4],
           image_url: col[5],
           weight: col[6],
           lifespan: col[7],
-          range: multiPolygonCoords.length > 0 ? { type: "MultiPolygon", coordinates: multiPolygonCoords } : null,
-          lng: firstLng,
-          lat: firstLat
+          photo: isPhoto(col[5]),
+          range,
+          anchor,
+          lng: anchor ? anchor[0] : null,
+          lat: anchor ? anchor[1] : null
         });
         idCounter++;
       }
     }
 
+    parsedSpecies.sort((x, y) =>
+      (y.photo - x.photo) || ((SEVERITY[y.status] ?? 0) - (SEVERITY[x.status] ?? 0)) || (Number(x.id) - Number(y.id)));
     state.species = parsedSpecies;
     state.currentFilteredList = parsedSpecies;
-    document.getElementById("species-count-label").textContent = `PHOTO EDITION · ${state.species.length} ARTEN`;
+    document.getElementById("species-count-label").textContent =
+      `PHOTO EDITION · ${state.species.length} ARTEN` + (failedParts ? " (UNVOLLSTÄNDIG)" : "");
     
   } catch (error) {
     loader.classList.add("error"); loaderMsg.textContent = "Kritischer Fehler beim Laden der Datenbank."; console.error(error); return;
@@ -385,7 +606,6 @@ async function init() {
   });
 
   map.on("moveend", renderMarkers);
-  map.on("zoomend", renderMarkers);
 
   document.getElementById("close-sidebar").onclick = deselectSpecies;
   document.addEventListener("keydown", e => { if (e.key === "Escape") deselectSpecies(); });
@@ -403,68 +623,67 @@ const MAX_MARKERS_ON_SCREEN = 300;
 
 function renderMarkers() {
   if (!window._map) return;
-  const bounds = window._map.getBounds();
-  
-  let visibleSpecies = state.currentFilteredList.filter(sp => {
-    if (sp.lng === null || sp.lat === null) return false; 
-    return bounds.contains([sp.lng, sp.lat]);
-  });
+  const map = window._map, bnd = map.getBounds();
+  const view = [Math.max(-180, bnd.getWest()), Math.max(-85, bnd.getSouth()), Math.min(180, bnd.getEast()), Math.min(85, bnd.getNorth())];
 
-  visibleSpecies.sort((a, b) => {
-    if (a.image_url && !b.image_url) return -1;
-    if (!a.image_url && b.image_url) return 1;
-    return 0; 
-  });
+  // Marker liegen im Verbreitungsgebiet UND im sichtbaren Ausschnitt; je mehr man zoomt, desto mehr Arten passen hinein.
+  const picked = pickMarkers(
+    state.currentFilteredList, view,
+    (lng, lat) => { const p = map.project([lng, lat]); return [p.x, p.y]; },
+    { cap: MAX_MARKERS_ON_SCREEN, minDist: window.innerWidth <= 900 ? 46 : 52, forceId: state.selectedId }
+  );
+  const keep = new Set(picked.map(m => m.sp.id));
 
-  visibleSpecies = visibleSpecies.slice(0, MAX_MARKERS_ON_SCREEN);
-  const visibleIds = new Set(visibleSpecies.map(sp => sp.id));
-
-  for (let [id, markerObj] of activeMarkers) {
-    if (!visibleIds.has(id)) {
-      markerObj.marker.remove(); 
-      activeMarkers.delete(id);  
-    }
+  for (const [id, markerObj] of activeMarkers) {
+    if (!keep.has(id)) { markerObj.marker.remove(); activeMarkers.delete(id); }
   }
 
-  visibleSpecies.forEach(sp => {
-    if (!activeMarkers.has(sp.id)) {
-      const el = document.createElement("div");
-      el.className = "photo-marker";
-      if (state.selectedId === sp.id) el.classList.add("selected");
-      el.dataset.id = sp.id;
-      
-      const inner = document.createElement("div");
-      inner.className = "marker-inner";
-      
-      if (sp.image_url && sp.image_url.startsWith('http')) {
-        const img = document.createElement("img");
-        img.src = sp.image_url;
-        img.loading = "lazy"; 
-        img.onerror = () => { inner.innerHTML = '<div class="placeholder">🐾</div>'; };
-        inner.appendChild(img);
-      } else {
-        inner.innerHTML = '<div class="placeholder">🐾</div>';
-      }
-      
-      const statusDot = document.createElement("div");
-      statusDot.className = "status-dot";
-      statusDot.style.background = STATUS_COLORS[sp.status] || '#888';
-      
-      el.appendChild(inner);
-      el.appendChild(statusDot);
-      
-      el.addEventListener("click", e => { 
-        e.stopPropagation(); 
-        selectSpecies(sp.id); 
-      });
+  picked.forEach(({ sp, lng, lat }) => {
+    const existing = activeMarkers.get(sp.id);
+    if (existing) { existing.marker.setLngLat([lng, lat]); return; }
 
-      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([sp.lng, sp.lat])
-        .addTo(window._map);
-        
-      activeMarkers.set(sp.id, { marker, el, species: sp });
+    const el = document.createElement("div");
+    el.className = "photo-marker";
+    if (state.selectedId === sp.id) el.classList.add("selected");
+    el.dataset.id = sp.id;
+
+    const inner = document.createElement("div");
+    inner.className = "marker-inner";
+
+    if (sp.photo) {
+      const img = document.createElement("img");
+      img.src = sp.image_url;
+      img.alt = sp.common || sp.sciName || "";
+      img.loading = "lazy";
+      img.onerror = () => { inner.innerHTML = '<div class="placeholder">🐾</div>'; };
+      inner.appendChild(img);
+    } else {
+      inner.innerHTML = '<div class="placeholder">🐾</div>';
     }
+
+    const statusDot = document.createElement("div");
+    statusDot.className = "status-dot";
+    statusDot.style.background = STATUS_COLORS[sp.status] || "#888";
+
+    el.appendChild(inner);
+    el.appendChild(statusDot);
+    el.addEventListener("click", e => { e.stopPropagation(); selectSpecies(sp.id); });
+
+    const marker = new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map);
+    activeMarkers.set(sp.id, { marker, el, species: sp });
   });
+}
+
+function rangeGeometry(sp) {
+  if (!sp.range) return null;
+  return {
+    type: "MultiPolygon",
+    coordinates: sp.range.rings.map(r => {
+      const ring = [];
+      for (let k = 0; k < r.length; k += 2) ring.push([r[k], r[k + 1]]);
+      return [ring];
+    })
+  };
 }
 
 function selectSpecies(id) {
@@ -476,7 +695,7 @@ function selectSpecies(id) {
 
   window._map.getSource("selected-range").setData({
     type: "FeatureCollection",
-    features: sp.range ? [{ type: "Feature", properties: { color: STATUS_COLORS[sp.status] || "#888" }, geometry: sp.range }] : []
+    features: sp.range ? [{ type: "Feature", properties: { color: STATUS_COLORS[sp.status] || "#888" }, geometry: rangeGeometry(sp) }] : []
   });
 
   if (window.innerWidth <= 900) {
@@ -488,14 +707,17 @@ function selectSpecies(id) {
   showSpeciesDetail(sp);
   document.getElementById("hint").classList.add("hidden");
 
-  if(sp.lat && sp.lng) { 
-     const isMobile = window.innerWidth <= 900;
-     window._map.flyTo({ 
-       center: [sp.lng, sp.lat], 
-       zoom: isMobile ? 2 : 3, 
-       padding: isMobile ? { bottom: window.innerHeight * 0.45 } : { right: 400 },
-       duration: 800 
-     });
+  if (sp.range) {
+    const isMobile = window.innerWidth <= 900;
+    const padding = isMobile
+      ? { top: 70, bottom: Math.round(window.innerHeight * 0.45) + 20, left: 30, right: 30 }
+      : { top: 70, bottom: 70, left: 50, right: 450 };
+    const bb = sp.range.bbox;
+    if (bb[2] - bb[0] < 300) {
+      window._map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding, maxZoom: 6, duration: 800 });
+    } else {
+      window._map.flyTo({ center: sp.anchor, zoom: 2, padding, duration: 800 });
+    }
   }
 }
 
@@ -531,7 +753,7 @@ function buildFilterChips() {
   
   make("order-chips", unique(state.species.map(s => s.order).filter(Boolean)), "orders");
   make("family-chips", unique(state.species.map(s => s.family).filter(Boolean)), "families");
-  make("status-chips", ["LC","NT","VU","EN","CR"].filter(s => state.species.some(sp => sp.status === s)), "statuses", true);
+  make("status-chips", ["LC","NT","VU","EN","CR","EW","EX","DD"].filter(s => state.species.some(sp => sp.status === s)), "statuses", true);
 }
 
 function applyFilters() {
@@ -567,26 +789,32 @@ function applyFilters() {
 
 function showSpeciesDetail(sp) {
   const el = document.getElementById("species-detail");
-  
-  const bgStyle = sp.image_url ? `background-image: url('${sp.image_url}');` : '';
-  const orderName = sp.order ? sp.order.toUpperCase() : '';
-  const readableOrder = TAXONOMY_LABELS[orderName] ? `${sp.order} (${TAXONOMY_LABELS[orderName]})` : (sp.order || 'Unbekannt');
+  const known = v => v && !String(v).trim().startsWith("?");
+  const orderName = sp.order ? sp.order.toUpperCase() : "";
+  const readableOrder = TAXONOMY_LABELS[orderName] ? `${sp.order} (${TAXONOMY_LABELS[orderName]})` : (sp.order || "Unbekannt");
+  const photo = isPhoto(sp.image_url);
+  const credit = photo ? commonsPage(sp.image_url) : null;
+
+  const cells = [];
+  if (known(sp.weight)) cells.push(`<div class="info-cell"><div class="label">Gewicht</div><div class="value">${esc(sp.weight)}</div></div>`);
+  if (known(sp.lifespan)) cells.push(`<div class="info-cell"><div class="label">Alter</div><div class="value">${esc(sp.lifespan)}</div></div>`);
 
   el.innerHTML = `
-    <div class="hero-image" id="hero-image" style="${bgStyle}"></div>
+    <div class="hero-image" id="hero-image"></div>
+    ${credit ? `<div class="img-credit"><a href="${esc(credit)}" target="_blank" rel="noopener">Bild: Wikimedia Commons (Lizenz &amp; Urheber)</a></div>` : ""}
     <div class="detail-content">
-      <div class="common">${sp.common || "Unbekannt"}</div>
-      <div class="scientific">${sp.sciName || ""}</div>
+      <div class="common">${esc(sp.common || "Unbekannt")}</div>
+      <div class="scientific">${esc(sp.sciName)}</div>
       <div class="badge-row">
-        <span class="badge status-badge" style="background:${STATUS_COLORS[sp.status] || '#888'}">${sp.status} · ${STATUS_LABELS[sp.status] || 'Unknown'}</span>
-        <span class="badge taxonomy clickable" onclick="triggerSearch('${sp.order}')">${readableOrder}</span>
-        <span class="badge taxonomy clickable" onclick="triggerSearch('${sp.family}')">${sp.family || 'Familie Unbekannt'}</span>
+        <span class="badge status-badge" style="background:${STATUS_COLORS[sp.status] || "#888"}">${esc(sp.status)} · ${esc(STATUS_LABELS[sp.status] || "Unknown")}</span>
+        <span class="badge taxonomy clickable" data-term="${esc(sp.order)}">${esc(readableOrder)}</span>
+        <span class="badge taxonomy clickable" data-term="${esc(sp.family)}">${esc(sp.family || "Familie Unbekannt")}</span>
       </div>
-      <div class="info-grid">
-        <div class="info-cell"><div class="label">Gewicht</div><div class="value">${sp.weight || '? kg'}</div></div>
-        <div class="info-cell"><div class="label">Alter</div><div class="value">${sp.lifespan || '? J.'}</div></div>
-      </div>
+      ${cells.length ? `<div class="info-grid">${cells.join("")}</div>` : ""}
     </div>`;
+
+  if (photo) document.getElementById("hero-image").style.backgroundImage = `url("${sp.image_url.replace(/"/g, "%22")}")`;
+  el.querySelectorAll(".badge.clickable").forEach(b => b.addEventListener("click", () => triggerSearch(b.dataset.term)));
 }
 
 init();

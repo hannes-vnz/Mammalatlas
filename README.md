@@ -8,10 +8,13 @@ Interactive world atlas of mammals: distribution ranges as map layers, filterabl
 
 ## Features
 
-- 5,400+ species with distribution polygons rendered with MapLibre GL JS
-- Dark map theme, IUCN status colour-coding
-- Photo markers from Wikimedia Commons
-- Filters by order and conservation status
+- 5,469 species with distribution polygons rendered with MapLibre GL JS
+- Dark map theme, colour-coding for all IUCN categories (LC, NT, VU, EN, CR, EW, EX, DD)
+- Photo markers from Wikimedia Commons, each species profile links to the image's licence page
+- Markers follow the visible map area: the more you zoom in, the more species of that region appear (placed inside their range, decluttered by screen distance, photos and threatened species first)
+- Search and filters by order, family and conservation status
+- **[Insights page](https://USERNAME.github.io/mammalatlas/insights.html):** hotspot map of species richness (all species / threatened species) plus charts on conservation status and the most threatened orders
+- Responsive layout with a bottom sheet on mobile
 
 ## Data
 
@@ -26,6 +29,12 @@ Species data lives in `data/species_part_1.txt` and `data/species_part_2.txt` (t
 | `w`, `l` | Weight and lifespan (`?` if unknown) |
 | `range` | Distribution polygon as `lon\|lat` pairs separated by `;`, multiple polygons separated by `*` |
 
+### Data notes
+
+- 3,089 species have a real photo. For 2,238 species the image field only contains the IUCN status icon from the Wikipedia infobox, and 142 have no image at all. The app shows a placeholder for both.
+- Lifespan is not available yet (empty for all species), weight is missing for 2,156 species. Unknown values are hidden in the species profile.
+- 27 species have no distribution polygon and therefore do not appear on the map.
+
 <!-- TODO: add sources and licences for range polygons, IUCN status and the enrichment pipeline before publishing -->
 
 ## Run locally
@@ -36,6 +45,22 @@ The app loads the data files with `fetch`, so it needs a local server (opening t
 python -m http.server 8000
 # then open http://localhost:8000
 ```
+
+## Project structure
+
+```
+index.html        # atlas (map, filters, species profiles)
+insights.html     # analysis page (hotspots, statistics)
+data/             # species_part_1.txt, species_part_2.txt
+```
+
+Both pages share the same small core (range parsing, point-in-polygon, marker selection, richness raster), kept in one block marked `ATLAS-CORE` at the top of each script.
+
+## Ideas / roadmap
+
+- More analysis pages (e.g. body size vs. threat status, taxonomy explorer)
+- Reproducible data pipeline (script + documented sources) in this repository
+- Replace icon-only image entries with real photos, fill in lifespan data
 
 ## Built with
 

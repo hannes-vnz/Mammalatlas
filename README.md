@@ -2,7 +2,7 @@
 
 Interactive world atlas of mammals: distribution ranges as map layers, filterable by order and IUCN status, with species photos from Wikimedia Commons. Runs entirely in the browser.
 
-**[Live demo](https://USERNAME.github.io/mammalatlas/)** · Single HTML file + two data files, no framework
+**[Live demo](https://hannes-vnz.github.io/Mammalatlas/)** · Single HTML file + two data files, no framework
 
 <!-- ![Screenshot](screenshots/preview.png) -->
 

@@ -49,6 +49,7 @@ WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
 WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 GBIF_API = "https://api.gbif.org/v1"
+IUCN_API = "https://api.iucnredlist.org/api/v4"
 
 Q_MAMMALIA, Q_SPECIES, Q_SUBSPECIES, Q_ORDER, Q_FAMILY = "Q7377", "Q7432", "Q68947", "Q36602", "Q35409"
 
@@ -284,6 +285,11 @@ def _na(v):
     return "" if v in ("NA", "N/A") else v
 
 
+def _split_mdd(v):
+    """'Neotropic|Nearctic?' -> ['Neotropic', 'Nearctic']; unsichere Angaben ('?') zaehlen mit, 'NA' nicht."""
+    return [x.strip().rstrip("?").replace(" (Biorealm)", "") for x in _na(v).split("|") if x.strip() and _na(x) != ""]
+
+
 def _float(v):
     try:
         return float(_na(v))
@@ -318,6 +324,7 @@ def load_mdd(path, only_orders=None, limit_per_order=None):
                         "synonyms": [m.group(2).strip()] if m and m.group(2) else [],   # Name, unter dem IUCN die Art fuehrt
                         "extinct": _na(r.get("extinct")) == "1", "domestic": _na(r.get("domestic")) == "1",
                         "countries": _na(r.get("countryDistribution")).replace("|", ", "),
+                        "realms": _split_mdd(r.get("biogeographicRealm")),
                         "typeLat": _float(r.get("typeLocalityLatitude")), "typeLng": _float(r.get("typeLocalityLongitude")),
                         "iucnId": None, "gbifId": None, "wikiTitle": None, "imageFile": None,
                         "massG": None, "lifespanYears": None, "source": "mdd"})
@@ -679,6 +686,116 @@ def crawl_gbif(http, names, max_species=200, max_records=300, log=print, keys=No
         if i % 25 == 0:
             log(f"  GBIF: {i}/{min(len(names), max_species)}")
     return out
+
+
+# --------------------------------------------------------------------------- IUCN: Gefaehrdungsursachen
+# Die IUCN-Daten selbst werden nicht veroeffentlicht (Nutzungsbedingungen), nur Zaehlungen je Region (Schritt 'threats').
+THREAT_LABELS = {  # IUCN Threats Classification Scheme 3.3, oberste Ebene, plus wichtige Unterklassen
+    "1": "Siedlung und Gewerbe", "2": "Landwirtschaft und Aquakultur", "3": "Energie und Bergbau",
+    "4": "Verkehrswege", "5": "Nutzung biologischer Ressourcen", "6": "Stoerung durch Menschen",
+    "7": "Veraenderung natuerlicher Systeme", "8": "Invasive Arten und Krankheiten", "9": "Verschmutzung",
+    "10": "Geologische Ereignisse", "11": "Klimawandel und Extremwetter", "12": "Sonstiges",
+    "2_1": "Ackerbau und Plantagen", "2_3": "Viehzucht", "5_1": "Jagd und Fang", "5_3": "Holzeinschlag",
+    "5_4": "Fischerei", "7_1": "Feuer", "8_1": "Invasive gebietsfremde Arten",
+}
+THREATENED = ("VU", "EN", "CR")
+
+
+def _en(v):
+    return (v.get("en") if isinstance(v, dict) else v) or ""
+
+
+def iucn_token(path=""):
+    """Schluessel aus der Umgebung (IUCN_TOKEN) oder einer Datei; nie als Kommandozeilenargument (Shell-Verlauf)."""
+    import os
+    tok = os.environ.get("IUCN_TOKEN", "").strip()
+    if not tok and path and Path(path).exists():
+        tok = Path(path).read_text(encoding="utf-8").strip()
+    if not tok:
+        raise SystemExit("Kein IUCN-Schluessel: export IUCN_TOKEN=... (Konto: api.iucnredlist.org)")
+    return tok
+
+
+def iucn_class_assessments(http, token, class_name="Mammalia", log=print):
+    """Neueste globale Bewertungen einer Klasse (100 je Seite): [{'assessment_id', 'sciName', 'category'}]."""
+    out, page = [], 1
+    while True:
+        d = http.get_json(f"{IUCN_API}/taxa/class/{class_name}", {"latest": "true", "scope_code": "1", "page": page},
+                          {"Authorization": token})
+        rows = d.get("assessments") or []
+        for a in rows:
+            out.append({"assessment_id": a.get("assessment_id"), "sciName": a.get("taxon_scientific_name") or "",
+                        "category": a.get("red_list_category_code") or ""})
+        if len(rows) < 100:
+            return out
+        page += 1
+        if page % 10 == 0:
+            log(f"  IUCN-Liste: Seite {page}, {len(out)} Bewertungen")
+
+
+def parse_assessment(d):
+    """Gefaehrdungen (nur laufende/kuenftige) und Laendercodes aus einer IUCN-Bewertung."""
+    threats = []
+    for t in d.get("threats") or []:
+        timing = _en(t.get("timing"))
+        if timing and timing.lower().startswith("past"):
+            continue
+        threats.append({"code": str(t.get("code") or ""), "title": _en(t.get("description")), "timing": timing,
+                        "scope": _en(t.get("scope")), "severity": _en(t.get("severity"))})
+    countries = sorted({(l.get("code") or "").upper() for l in d.get("locations") or []        # nur Laender (ISO-2), keine Teilgebiete wie 'MAQ-OO'
+                        if re.fullmatch(r"[A-Za-z]{2}", l.get("code") or "") and _en(l.get("presence") or "Extant").lower().startswith("extant")})
+    cat = d.get("red_list_category") or {}
+    return {"category": cat.get("code", "") if isinstance(cat, dict) else str(cat), "threats": threats,
+            "countries": countries, "year": d.get("year_published")}
+
+
+def crawl_iucn(http, token, names=None, limit=None, log=print):
+    """{IUCN-Name: Bewertung} fuer Saeugetiere; names (klein, optional) begrenzt auf diese Arten."""
+    listing = iucn_class_assessments(http, token, log=log)
+    if names is not None:
+        listing = [a for a in listing if name_key(a["sciName"]) in names]
+    listing = listing[:limit] if limit else listing
+    log(f"  IUCN: {len(listing)} Bewertungen werden geladen")
+    out = {}
+    for i, a in enumerate(listing, 1):
+        try:
+            d = http.get_json(f"{IUCN_API}/assessment/{a['assessment_id']}", None, {"Authorization": token})
+            out[a["sciName"]] = {"assessmentId": a["assessment_id"], **parse_assessment(d)}
+            out[a["sciName"]]["category"] = out[a["sciName"]]["category"] or a["category"]
+        except CrawlError as e:
+            log(f"  IUCN {a['sciName']}: {e}")
+        if i % 100 == 0:
+            log(f"  IUCN: {i}/{len(listing)}")
+    return out
+
+
+def threat_summary(iucn, taxa, statuses=THREATENED):
+    """Zaehlt je Region (MDD-Biorealm) gefaehrdete Arten je Ursache. Nur Zaehlungen, keine IUCN-Rohdaten."""
+    by_name = {}
+    for s in taxa:
+        for n in [s["sciName"]] + list(s.get("synonyms") or []):
+            by_name.setdefault(name_key(n), s)
+    regions, total, unmatched = {}, {"species": 0, "byStatus": {}, "threats": {}}, 0
+
+    def count(r, cat, keys):
+        r["species"] += 1
+        r["byStatus"][cat] = r["byStatus"].get(cat, 0) + 1
+        for k in keys & set(THREAT_LABELS):
+            r["threats"][k] = r["threats"].get(k, 0) + 1
+
+    for name, a in iucn.items():
+        if a.get("category") not in statuses:
+            continue
+        s = by_name.get(name_key(name))
+        if not s:
+            unmatched += 1
+            continue
+        codes = {t["code"] for t in a["threats"] if t["code"]}
+        keys = {c.split("_")[0] for c in codes} | {"_".join(c.split("_")[:2]) for c in codes if "_" in c}
+        count(total, a["category"], keys)          # jede Art einmal, auch wenn sie in mehreren Regionen lebt
+        for realm in s.get("realms") or ["Unbekannt"]:
+            count(regions.setdefault(realm, {"species": 0, "byStatus": {}, "threats": {}}), a["category"], keys)
+    return regions, total, unmatched
 
 
 # --------------------------------------------------------------------------- Ausgestorbene Arten
@@ -1093,6 +1210,16 @@ def build_parser():
     x.add_argument("--out", default="crawl/extinct_species.json", help="erst pruefen, dann nach data/ kopieren")
     x.add_argument("--keep", default="data/extinct_species.json", help="handgepflegte Eintraege daraus uebernehmen ('' = keine)")
 
+    iu = sub.add_parser("iucn", help="Gefaehrdungsursachen aus der IUCN-Roten Liste (Schluessel in IUCN_TOKEN)")
+    iu.add_argument("--taxa", default="crawl/taxa.json", help="nur Arten aus dieser Liste (Name oder Synonym)")
+    iu.add_argument("--token-file", default="", help="Datei mit dem Schluessel statt IUCN_TOKEN")
+    iu.add_argument("--limit", type=int, default=None, help="zum Testen: hoechstens N Bewertungen")
+    iu.add_argument("--out", default="crawl/iucn.json", help="Rohdaten, nicht veroeffentlichen")
+
+    th = sub.add_parser("threats", help="Ursachen je Region zaehlen -> data/threats_by_region.json (ohne Netz)")
+    th.add_argument("--iucn", default="crawl/iucn.json"); th.add_argument("--taxa", default="crawl/taxa.json")
+    th.add_argument("--out", default="data/threats_by_region.json")
+
     m = sub.add_parser("merge", help="in species_part_*.txt zusammenfuehren (ohne --apply nur Vorschau)")
     m.add_argument("--data", default="data"); m.add_argument("--taxa", default="crawl/taxa.json")
     m.add_argument("--gbif", default="crawl/gbif.json")
@@ -1159,6 +1286,25 @@ def main(argv=None, http=None):
         _save(a.out, {"meta": {"generated": date.today().isoformat(), "count": len(data), "crawler": VERSION,
                                "note": "Jahre, Orte und Ursachen sind Heuristiken. Korrekturen in extinct_overrides.json."},
                       "species": data})
+    elif a.cmd == "iucn":
+        token = iucn_token(a.token_file)
+        taxa = _load(a.taxa) if Path(a.taxa).exists() else None
+        names = None if taxa is None else {name_key(n) for s in taxa for n in [s["sciName"]] + list(s.get("synonyms") or [])}
+        try:
+            data = crawl_iucn(http, token, names, a.limit)
+        except CrawlError as e:
+            raise SystemExit(f"IUCN-Abfrage fehlgeschlagen: {e}\nBei HTTP 401: Schluessel pruefen bzw. im IUCN-Konto freischalten.")
+        _save(a.out, data)
+    elif a.cmd == "threats":
+        regions, total, unmatched = threat_summary(_load(a.iucn), _load(a.taxa))
+        total = sum(1 for v in _load(a.iucn).values() if v.get("category") in THREATENED)
+        print(f"{total} gefaehrdete Arten (VU/EN/CR), {unmatched} ohne Zuordnung zu MDD")
+        _save(a.out, {"meta": {"generated": date.today().isoformat(), "source": "IUCN Red List (latest global assessments), "
+                               "Regionen: Mammal Diversity Database (Biorealm)",
+                               "note": "Zaehlungen gefaehrdeter Arten (VU, EN, CR) je Ursache; laufende und kuenftige Gefaehrdungen. "
+                                       "Eine Art kann mehrere Ursachen und Regionen haben.",
+                               "citation": f"IUCN {date.today().year}. The IUCN Red List of Threatened Species. www.iucnredlist.org"},
+                      "labels": THREAT_LABELS, "total": total, "regions": regions})
     elif a.cmd == "merge":
         rows = read_species(a.data)
         gb = _load(a.gbif) if Path(a.gbif).exists() else {}

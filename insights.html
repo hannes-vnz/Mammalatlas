@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Mammal Atlas · Insights</title>
-<meta name="description" content="Hotspots, Endemismus und Bedrohung der Säugetiere: interaktive Analyse von über 5.400 Arten mit Region-Explorer, 3D-Ansicht und Statistiken." />
+<meta name="description" content="Hotspots, Endemismus und Bedrohung der Säugetiere: interaktive Analyse von über 6.700 Arten mit Region-Explorer, 3D-Ansicht und Statistiken." />
 <meta property="og:title" content="Mammal Atlas · Insights" />
 <meta property="og:description" content="Wo leben die meisten Säugetierarten, wo sind sie am stärksten bedroht? Interaktive Hotspot-Karte mit Region-Explorer." />
 <meta property="og:type" content="website" />
@@ -98,6 +98,11 @@
   footer { border-top: 1px solid var(--border-soft); padding: 18px clamp(16px, 4vw, 48px); font-size: 11px; color: var(--text-dim); text-align: center; }
   footer a { color: var(--text-dim); }
   code { background: var(--panel-2); padding: 2px 6px; border-radius: 4px; }
+  .seg.wrap { flex-wrap: wrap; } .seg.wrap button { border-right: 1px solid var(--border-soft); }
+  .heat td.num { position: relative; }
+  .heat td.num span { position: relative; z-index: 1; }
+  .heat td.num i { position: absolute; inset: 3px; border-radius: 4px; background: #ef4444; }
+  .heat th.rot { white-space: normal; min-width: 70px; line-height: 1.25; cursor: default; }
 </style>
 </head>
 <body>
@@ -106,7 +111,7 @@
   <a class="btn" href="./">← Zurück zum Atlas</a>
 </header>
 <nav class="sub" id="subnav" hidden>
-  <a href="#overview">Überblick</a><a href="#hotspots">Hotspots</a><a href="#latitude">Breitengrad</a><a href="#status-section">Status &amp; Ordnungen</a><a href="#ranges">Verbreitungsgebiete</a><a href="#families">Familien</a>
+  <a href="#overview">Überblick</a><a href="#hotspots">Hotspots</a><a href="#latitude">Breitengrad</a><a href="#status-section">Status &amp; Ordnungen</a><a href="#threats" id="nav-threats" hidden>Ursachen</a><a href="#ranges">Verbreitungsgebiete</a><a href="#families">Familien</a>
 </nav>
 
 <main>
@@ -152,6 +157,19 @@
         <div class="legend-inline"><span><b style="background:#ef4444"></b>bedroht</span><span><b style="background:#4b5563"></b>nicht bedroht</span></div></div>
     </div>
     <div class="card" style="margin-top:20px"><h3>Welche Ordnungen sind am stärksten bedroht?</h3><p class="sub" style="margin-bottom:8px">Anteil bedrohter Arten, nur Ordnungen mit mindestens 40 Arten</p><div id="chart-share"></div></div>
+  </section>
+
+  <section id="threats" hidden>
+    <h2>Warum sind Arten gefährdet?</h2>
+    <p class="sub">Gefährdungsursachen der bedrohten Arten (VU · EN · CR) nach der IUCN-Roten Liste, je Großregion. Gezählt werden laufende und absehbare Gefährdungen; eine Art kann mehrere Ursachen haben und in mehreren Regionen leben.</p>
+    <div class="controls"><div class="ctl">Region<div class="seg wrap" id="threat-regions"></div></div></div>
+    <div class="grid2">
+      <div class="card"><h3 id="threat-title">Ursachen</h3><p class="sub" style="margin-bottom:8px" id="threat-sub"></p><div id="chart-threats"></div></div>
+      <div class="card"><h3>Wichtige Einzelursachen</h3><p class="sub" style="margin-bottom:8px">Unterklassen, die oft den Ausschlag geben</p><div id="chart-threats-detail"></div></div>
+    </div>
+    <div class="card tablewrap heat" style="margin-top:20px"><h3>Regionen im Vergleich</h3><p class="sub" style="margin-bottom:8px">Anteil der bedrohten Arten einer Region, die von der Ursache betroffen sind. Je kräftiger, desto häufiger.</p>
+      <table><thead id="threatHead"></thead><tbody id="threatBody"></tbody></table></div>
+    <p class="note" id="threat-note"></p>
   </section>
 
   <section id="ranges">
@@ -671,6 +689,43 @@ function renderLatitude(g) {
 }
 
 // ---------- Status, Ordnungen ----------
+// ---------- Gefaehrdungsursachen (Zaehlungen aus data/threats_by_region.json, erzeugt mit tools/crawler.py threats) ----------
+const REALM_LABELS = { Neotropic: "Mittel- & Südamerika", Afrotropic: "Afrika südl. der Sahara", Indomalaya: "Süd- & Südostasien",
+  Palearctic: "Europa, Nordafrika & Nordasien", Australasia: "Australien & Neuguinea", Nearctic: "Nordamerika", Oceania: "Ozeanien", Marine: "Meere" };
+const MAIN_THREATS = ["2", "5", "1", "8", "7", "11", "3", "9", "6", "4", "10", "12"];
+const DETAIL_THREATS = ["5_1", "2_1", "5_3", "2_3", "8_1", "7_1", "5_4"];
+const thr = { data: null, region: "" };
+async function loadThreats() {
+  try {
+    const r = await fetch("./data/threats_by_region.json");
+    if (!r.ok) return;
+    thr.data = await r.json();
+  } catch (e) { return; }
+  const regions = Object.entries(thr.data.regions).filter(([k, v]) => k !== "Unbekannt" && v.species >= 5).sort((a, b) => b[1].species - a[1].species);
+  $("threat-regions").innerHTML = [["", thr.data.total]].concat(regions).map(([k]) =>
+    `<button data-r="${esc(k)}" class="${k === thr.region ? "active" : ""}">${esc(k ? (REALM_LABELS[k] || k) : "Alle Regionen")}</button>`).join("");
+  $("threat-regions").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    thr.region = b.dataset.r; $("threat-regions").querySelectorAll("button").forEach(x => x.classList.toggle("active", x === b)); renderThreats();
+  }));
+  const cols = MAIN_THREATS.filter(c => (thr.data.total.threats[c] || 0) > 0).slice(0, 8);
+  $("threatHead").innerHTML = `<tr><th>Region</th><th class="num">bedroht</th>${cols.map(c => `<th class="num rot">${esc(thr.data.labels[c])}</th>`).join("")}</tr>`;
+  $("threatBody").innerHTML = regions.map(([k, v]) => `<tr><td>${esc(REALM_LABELS[k] || k)}</td><td class="num">${fmt(v.species)}</td>${cols.map(c => {
+    const share = (v.threats[c] || 0) / v.species;
+    return `<td class="num" title="${esc(thr.data.labels[c])}: ${fmt(v.threats[c] || 0)} von ${fmt(v.species)}"><i style="opacity:${(0.08 + 0.75 * share).toFixed(2)}"></i><span>${fmtDec(100 * share, 0)} %</span></td>`;
+  }).join("")}</tr>`).join("");
+  $("threat-note").innerHTML = `Quelle: ${esc(thr.data.meta.citation)}. Regionen: Mammal Diversity Database. Stand ${esc(thr.data.meta.generated)}. Veröffentlicht werden nur Zählungen, keine Bewertungen einzelner Arten.`;
+  $("threats").hidden = false; $("nav-threats").hidden = false;
+  renderThreats();
+}
+function renderThreats() {
+  const d = thr.region ? thr.data.regions[thr.region] : thr.data.total, L = thr.data.labels;
+  $("threat-title").textContent = "Ursachen · " + (thr.region ? (REALM_LABELS[thr.region] || thr.region) : "alle Regionen");
+  $("threat-sub").textContent = `${fmt(d.species)} bedrohte Arten; Anteil, der von der Ursache betroffen ist`;
+  const row = c => barRow(L[c], [{ v: (d.threats[c] || 0) / d.species, c: "#ef4444" }], 1, pct(d.threats[c] || 0, d.species));
+  $("chart-threats").innerHTML = MAIN_THREATS.filter(c => d.threats[c]).sort((a, b) => d.threats[b] - d.threats[a]).map(row).join("");
+  $("chart-threats-detail").innerHTML = DETAIL_THREATS.filter(c => d.threats[c]).sort((a, b) => d.threats[b] - d.threats[a]).map(row).join("");
+}
+
 function barRow(name, segments, max, valText, attrs = "") {
   const segs = segments.map(s => `<i style="width:${Math.max(0, 100 * s.v / max).toFixed(2)}%;background:${s.c}"></i>`).join("");
   return `<div class="bar-row ${attrs ? "click" : ""}" ${attrs}><div class="name" title="${esc(name)}">${esc(name)}</div><div class="track">${segs}</div><div class="val">${valText}</div></div>`;
@@ -797,7 +852,7 @@ async function main() {
   readHash();
   buildFams();
   setupControls();
-  renderKpis(); renderStatusAndOrders(); renderRanges(); renderFams();
+  renderKpis(); renderStatusAndOrders(); renderRanges(); renderFams(); loadThreats();
   $("content").hidden = false; $("subnav").hidden = false; status.style.display = "none";
   const ok = await loadMapLibre();
   if (!ok) { $("map").innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444">Konnte die Kartenbibliothek nicht laden.</div>'; refresh(); return; }

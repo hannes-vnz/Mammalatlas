@@ -387,3 +387,44 @@ def test_vorgeschichtlich_ausgestorbene_fallen_raus():
     out = c.build_extinct(http, taxa, None, log=lambda *a: None)
     assert [r["sciName"] for r in out] == ["Pipistrellus murrayi"]
     assert (out[0]["lat"], out[0]["lng"], out[0]["region"]) == (-10.5, 105.6, "Australia")
+
+
+# ------------------------------------------------------------------ IUCN
+IUCN_ASSESSMENT = {"assessment_id": 7, "year_published": "2020", "red_list_category": {"code": "EN"},
+                   "threats": [{"code": "5_1_1", "description": {"en": "Intentional use"}, "timing": "Ongoing", "scope": "Majority (50-90%)", "severity": "Rapid Declines"},
+                               {"code": "2_1_3", "description": {"en": "Agro-industry farming"}, "timing": "Ongoing"},
+                               {"code": "11_1", "description": {"en": "Habitat shifting"}, "timing": "Future"},
+                               {"code": "8_1_2", "description": {"en": "Named species"}, "timing": "Past, Unlikely to Return"}],
+                   "locations": [{"code": "ID", "presence": "Extant"}, {"code": "SG", "presence": "Extinct Post-1500"}, {"code": "IDN-SU", "presence": "Extant"}]}
+
+
+def test_iucn_bewertung_lesen_und_je_region_zaehlen():
+    a = c.parse_assessment(IUCN_ASSESSMENT)
+    assert a["category"] == "EN" and [t["code"] for t in a["threats"]] == ["5_1_1", "2_1_3", "11_1"]   # vergangene Gefaehrdung nicht
+    assert a["countries"] == ["ID"] and a["threats"][0]["severity"] == "Rapid Declines"
+    pages = {1: {"assessments": [{"assessment_id": 7, "taxon_scientific_name": "Manis javanica", "red_list_category_code": "CR"},
+                                 {"assessment_id": 8, "taxon_scientific_name": "Vulpes vulpes", "red_list_category_code": "LC"}]}}
+    http = Fake([(lambda u, p: u.endswith("/taxa/class/Mammalia"), lambda p: pages[p["page"]]),
+                 (lambda u, p: u.endswith("/assessment/7"), IUCN_ASSESSMENT)])
+    iucn = c.crawl_iucn(http, "geheim", names={"manis javanica"}, log=lambda *a: None)
+    assert list(iucn) == ["Manis javanica"] and iucn["Manis javanica"]["category"] == "EN"
+    taxa = [{"sciName": "Manis javanica", "realms": ["Indomalaya"], "synonyms": []},
+            {"sciName": "Paramanis culionensis", "realms": ["Indomalaya", "Australasia"], "synonyms": ["Manis culionensis"]}]
+    iucn["Manis culionensis"] = {"category": "CR", "threats": [{"code": "5_1_1"}], "countries": []}
+    iucn["Vulpes vulpes"] = {"category": "LC", "threats": [{"code": "5_1_1"}], "countries": []}
+    regions, total, unmatched = c.threat_summary(iucn, taxa)
+    assert total["species"] == 2 and total["threats"]["5_1"] == 2              # Art in zwei Regionen zaehlt einmal
+    assert regions["Indomalaya"]["species"] == 2 and regions["Indomalaya"]["threats"]["5_1"] == 2 and regions["Indomalaya"]["threats"]["5"] == 2
+    assert regions["Indomalaya"]["threats"]["2"] == 1 and regions["Indomalaya"]["threats"]["11"] == 1
+    assert regions["Australasia"]["byStatus"] == {"CR": 1} and "Vulpes vulpes" not in str(regions) and unmatched == 0
+
+
+def test_iucn_schluessel_nur_aus_umgebung(tmp_path, monkeypatch):
+    monkeypatch.delenv("IUCN_TOKEN", raising=False)
+    with pytest.raises(SystemExit):
+        c.iucn_token()
+    (tmp_path / "t").write_text("abc\n")
+    assert c.iucn_token(str(tmp_path / "t")) == "abc"
+    monkeypatch.setenv("IUCN_TOKEN", "xyz")
+    assert c.iucn_token() == "xyz"
+    assert c._split_mdd("Neotropic|Indomalaya?|Oceania (Biorealm)|NA") == ["Neotropic", "Indomalaya", "Oceania"]

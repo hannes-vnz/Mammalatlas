@@ -1,0 +1,6 @@
+.crawl_cache/
+crawl/
+data/.backup/
+.DS_Store
+__pycache__/
+.pytest_cache/

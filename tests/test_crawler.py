@@ -428,3 +428,12 @@ def test_iucn_schluessel_nur_aus_umgebung(tmp_path, monkeypatch):
     monkeypatch.setenv("IUCN_TOKEN", "xyz")
     assert c.iucn_token() == "xyz"
     assert c._split_mdd("Neotropic|Indomalaya?|Oceania (Biorealm)|NA") == ["Neotropic", "Indomalaya", "Oceania"]
+
+
+def test_threats_cli_schreibt_gesamtsumme(tmp_path):
+    (tmp_path / "iucn.json").write_text(json.dumps({"Manis javanica": {"category": "CR", "threats": [{"code": "5_1_1"}], "countries": []}}))
+    (tmp_path / "taxa.json").write_text(json.dumps([{"sciName": "Manis javanica", "realms": ["Indomalaya"], "synonyms": []}]))
+    out = tmp_path / "t.json"
+    c.main(["threats", "--iucn", str(tmp_path / "iucn.json"), "--taxa", str(tmp_path / "taxa.json"), "--out", str(out)])
+    d = json.loads(out.read_text())
+    assert d["total"]["species"] == 1 and d["total"]["threats"]["5_1"] == 1 and d["regions"]["Indomalaya"]["species"] == 1

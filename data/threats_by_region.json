@@ -1,0 +1,286 @@
+{
+ "meta": {
+  "generated": "2026-10-26",
+  "source": "IUCN Red List (latest global assessments), Regionen: Mammal Diversity Database (Biorealm)",
+  "note": "Zählungen gefährdeter Arten (VU, EN, CR) je Ursache; laufende und künftige Gefährdungen. Eine Art kann mehrere Ursachen und Regionen haben.",
+  "citation": "IUCN 2026. The IUCN Red List of Threatened Species. www.iucnredlist.org"
+ },
+ "labels": {
+  "1": "Siedlung und Gewerbe",
+  "2": "Landwirtschaft und Aquakultur",
+  "3": "Energie und Bergbau",
+  "4": "Verkehrswege",
+  "5": "Nutzung biologischer Ressourcen",
+  "6": "Störung durch Menschen",
+  "7": "Veränderung natürlicher Systeme",
+  "8": "Invasive Arten und Krankheiten",
+  "9": "Verschmutzung",
+  "10": "Geologische Ereignisse",
+  "11": "Klimawandel und Extremwetter",
+  "12": "Sonstiges",
+  "2_1": "Ackerbau und Plantagen",
+  "2_3": "Viehzucht",
+  "5_1": "Jagd und Fang",
+  "5_3": "Holzeinschlag",
+  "5_4": "Fischerei",
+  "7_1": "Feuer",
+  "8_1": "Invasive gebietsfremde Arten"
+ },
+ "total": {
+  "species": 1327,
+  "byStatus": {
+   "VU": 556,
+   "EN": 542,
+   "CR": 229
+  },
+  "threats": {
+   "2_3": 359,
+   "1": 451,
+   "4": 235,
+   "5": 998,
+   "2": 1015,
+   "5_3": 711,
+   "10": 29,
+   "8": 278,
+   "5_4": 55,
+   "11": 259,
+   "5_1": 639,
+   "8_1": 229,
+   "9": 120,
+   "2_1": 881,
+   "6": 214,
+   "7_1": 257,
+   "7": 350,
+   "12": 8,
+   "3": 274
+  }
+ },
+ "regions": {
+  "Neotropic": {
+   "species": 242,
+   "byStatus": {
+    "VU": 114,
+    "EN": 86,
+    "CR": 42
+   },
+   "threats": {
+    "2_3": 113,
+    "1": 108,
+    "4": 54,
+    "5": 159,
+    "2": 173,
+    "5_3": 121,
+    "6": 34,
+    "2_1": 148,
+    "3": 46,
+    "11": 33,
+    "5_1": 93,
+    "7_1": 37,
+    "7": 58,
+    "8": 42,
+    "10": 6,
+    "8_1": 33,
+    "9": 20,
+    "5_4": 6,
+    "12": 1
+   }
+  },
+  "Marine": {
+   "species": 33,
+   "byStatus": {
+    "EN": 15,
+    "VU": 14,
+    "CR": 4
+   },
+   "threats": {
+    "10": 1,
+    "5": 31,
+    "8": 13,
+    "5_4": 31,
+    "11": 19,
+    "6": 12,
+    "2_3": 1,
+    "7": 7,
+    "4": 21,
+    "8_1": 5,
+    "9": 25,
+    "1": 12,
+    "2": 7,
+    "3": 9,
+    "2_1": 3,
+    "5_3": 1,
+    "5_1": 2
+   }
+  },
+  "Palearctic": {
+   "species": 131,
+   "byStatus": {
+    "VU": 53,
+    "EN": 58,
+    "CR": 20
+   },
+   "threats": {
+    "11": 43,
+    "5_1": 71,
+    "8": 43,
+    "8_1": 31,
+    "5": 98,
+    "9": 27,
+    "5_3": 51,
+    "6": 49,
+    "2_3": 56,
+    "7_1": 20,
+    "7": 33,
+    "2_1": 65,
+    "4": 40,
+    "1": 58,
+    "2": 91,
+    "12": 2,
+    "3": 29,
+    "5_4": 6,
+    "10": 3
+   }
+  },
+  "Australasia": {
+   "species": 223,
+   "byStatus": {
+    "VU": 113,
+    "CR": 37,
+    "EN": 73
+   },
+   "threats": {
+    "5_1": 97,
+    "2_1": 127,
+    "8": 84,
+    "8_1": 80,
+    "5": 150,
+    "2": 149,
+    "5_3": 112,
+    "11": 49,
+    "7_1": 61,
+    "7": 62,
+    "4": 9,
+    "1": 42,
+    "3": 35,
+    "10": 6,
+    "9": 14,
+    "6": 25,
+    "2_3": 25,
+    "12": 3
+   }
+  },
+  "Indomalaya": {
+   "species": 293,
+   "byStatus": {
+    "VU": 123,
+    "CR": 48,
+    "EN": 122
+   },
+   "threats": {
+    "6": 43,
+    "2_3": 35,
+    "7_1": 60,
+    "7": 95,
+    "2_1": 233,
+    "5_1": 179,
+    "8": 32,
+    "4": 72,
+    "8_1": 27,
+    "5": 266,
+    "1": 137,
+    "2": 248,
+    "5_3": 212,
+    "3": 69,
+    "9": 27,
+    "11": 36,
+    "10": 9,
+    "5_4": 12,
+    "12": 3
+   }
+  },
+  "Afrotropic": {
+   "species": 349,
+   "byStatus": {
+    "EN": 153,
+    "VU": 134,
+    "CR": 62
+   },
+   "threats": {
+    "2_3": 124,
+    "5_1": 202,
+    "2_1": 275,
+    "8": 38,
+    "4": 42,
+    "8_1": 28,
+    "5": 279,
+    "2": 319,
+    "5_3": 202,
+    "3": 95,
+    "7": 88,
+    "7_1": 79,
+    "6": 56,
+    "9": 10,
+    "1": 75,
+    "11": 65,
+    "10": 2,
+    "5_4": 4
+   }
+  },
+  "Nearctic": {
+   "species": 93,
+   "byStatus": {
+    "VU": 33,
+    "EN": 40,
+    "CR": 20
+   },
+   "threats": {
+    "11": 24,
+    "6": 14,
+    "7_1": 6,
+    "7": 18,
+    "5_1": 23,
+    "12": 1,
+    "8": 38,
+    "4": 16,
+    "8_1": 32,
+    "5": 48,
+    "9": 8,
+    "1": 34,
+    "3": 12,
+    "5_3": 30,
+    "2": 58,
+    "2_1": 50,
+    "2_3": 29,
+    "10": 2,
+    "5_4": 2
+   }
+  },
+  "Oceania": {
+   "species": 10,
+   "byStatus": {
+    "EN": 7,
+    "VU": 2,
+    "CR": 1
+   },
+   "threats": {
+    "11": 9,
+    "2_1": 5,
+    "5": 9,
+    "1": 5,
+    "2": 7,
+    "5_3": 4,
+    "5_1": 6,
+    "6": 4,
+    "3": 2,
+    "8_1": 5,
+    "8": 5,
+    "10": 1,
+    "2_3": 1,
+    "7_1": 2,
+    "7": 2,
+    "9": 1,
+    "4": 1
+   }
+  }
+ }
+}

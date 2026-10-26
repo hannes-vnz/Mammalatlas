@@ -692,8 +692,8 @@ def crawl_gbif(http, names, max_species=200, max_records=300, log=print, keys=No
 # Die IUCN-Daten selbst werden nicht veroeffentlicht (Nutzungsbedingungen), nur Zaehlungen je Region (Schritt 'threats').
 THREAT_LABELS = {  # IUCN Threats Classification Scheme 3.3, oberste Ebene, plus wichtige Unterklassen
     "1": "Siedlung und Gewerbe", "2": "Landwirtschaft und Aquakultur", "3": "Energie und Bergbau",
-    "4": "Verkehrswege", "5": "Nutzung biologischer Ressourcen", "6": "Stoerung durch Menschen",
-    "7": "Veraenderung natuerlicher Systeme", "8": "Invasive Arten und Krankheiten", "9": "Verschmutzung",
+    "4": "Verkehrswege", "5": "Nutzung biologischer Ressourcen", "6": "Störung durch Menschen",
+    "7": "Veränderung natürlicher Systeme", "8": "Invasive Arten und Krankheiten", "9": "Verschmutzung",
     "10": "Geologische Ereignisse", "11": "Klimawandel und Extremwetter", "12": "Sonstiges",
     "2_1": "Ackerbau und Plantagen", "2_3": "Viehzucht", "5_1": "Jagd und Fang", "5_3": "Holzeinschlag",
     "5_4": "Fischerei", "7_1": "Feuer", "8_1": "Invasive gebietsfremde Arten",
@@ -1232,7 +1232,7 @@ def build_parser():
 def main(argv=None, http=None):
     a = build_parser().parse_args(argv)
     http = http or Http(a.cache, a.contact, a.delay)
-    if not a.contact and a.cmd not in ("merge", "traits"):
+    if not a.contact and a.cmd not in ("merge", "traits", "threats"):
         print("Hinweis: Bitte --contact angeben (Wikimedia/GBIF erwarten einen erreichbaren Kontakt im User-Agent).", file=sys.stderr)
 
     if a.cmd == "taxa":
@@ -1297,11 +1297,10 @@ def main(argv=None, http=None):
         _save(a.out, data)
     elif a.cmd == "threats":
         regions, total, unmatched = threat_summary(_load(a.iucn), _load(a.taxa))
-        total = sum(1 for v in _load(a.iucn).values() if v.get("category") in THREATENED)
-        print(f"{total} gefaehrdete Arten (VU/EN/CR), {unmatched} ohne Zuordnung zu MDD")
+        print(f"{total['species']} gefaehrdete Arten (VU/EN/CR), {unmatched} ohne Zuordnung zu MDD")
         _save(a.out, {"meta": {"generated": date.today().isoformat(), "source": "IUCN Red List (latest global assessments), "
                                "Regionen: Mammal Diversity Database (Biorealm)",
-                               "note": "Zaehlungen gefaehrdeter Arten (VU, EN, CR) je Ursache; laufende und kuenftige Gefaehrdungen. "
+                               "note": "Zählungen gefährdeter Arten (VU, EN, CR) je Ursache; laufende und künftige Gefährdungen. "
                                        "Eine Art kann mehrere Ursachen und Regionen haben.",
                                "citation": f"IUCN {date.today().year}. The IUCN Red List of Threatened Species. www.iucnredlist.org"},
                       "labels": THREAT_LABELS, "total": total, "regions": regions})

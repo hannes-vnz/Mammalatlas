@@ -2,7 +2,7 @@
 
 Interactive world atlas of mammals: distribution ranges as map layers, filterable by order and IUCN status, with species photos from Wikimedia Commons. Runs entirely in the browser.
 
-**[Live demo](https://USERNAME.github.io/mammalatlas/)** · Single HTML file + two data files, no framework
+**[Live demo](https://hannes-vnz.github.io/Mammalatlas/)** · Single HTML file + two data files, no framework
 
 <!-- ![Screenshot](screenshots/preview.png) -->
 
@@ -14,7 +14,7 @@ Interactive world atlas of mammals: distribution ranges as map layers, filterabl
 - Markers follow the visible map area: the more you zoom in, the more species of that region appear (placed inside their range, decluttered by screen distance, photos and threatened species first)
 - Search and filters by order, family and conservation status
 - **Extinct species mode:** switch to "† Ausgestorben" for an atlas of extinct mammals with a timeline slider (with a time-lapse), cause filter and species profiles. The bundled `data/extinct_species.json` is a small hand-curated seed (12 species, unverified); the crawler replaces it with a much larger, sourced dataset.
-- **[Insights page](https://USERNAME.github.io/mammalatlas/insights.html):** an analysis dashboard on top of the same data
+- **[Insights page](https://hannes-vnz.github.io/Mammalatlas/insights.html):** an analysis dashboard on top of the same data
   - hotspot map with four views (species richness, threatened species, share threatened, endemism index), order filter, 2° / 4° grid and a 3D mode
   - region explorer: click a cell to see its species with status, photo and a link into the atlas
   - latitude profile, conservation-status donut, most threatened orders, range-size distribution, smallest and largest ranges, sortable family table

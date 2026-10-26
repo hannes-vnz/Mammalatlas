@@ -573,10 +573,22 @@ async function init() {
 
   document.getElementById("app").style.visibility = "visible";
 
+  // Deep-Links, z. B. von der Insights-Seite: #view=lng,lat,zoom und #art=Wissenschaftlicher Name
+  const hashParams = {};
+  location.hash.replace(/^#/, "").split("&").forEach(p => {
+    const i = p.indexOf("=");
+    if (i > 0) { try { hashParams[p.slice(0, i)] = decodeURIComponent(p.slice(i + 1)); } catch (e) {} }
+  });
+  let startCenter = [10, 20], startZoom = 1.8;
+  if (hashParams.view) {
+    const v = hashParams.view.split(",").map(Number);
+    if (v.length === 3 && v.every(isFinite)) { startCenter = [v[0], v[1]]; startZoom = Math.min(10, Math.max(1, v[2])); }
+  }
+
   const map = new maplibregl.Map({
     container: "map",
     style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-    center: [10, 20], zoom: 1.8, maxZoom: 10, minZoom: 1
+    center: startCenter, zoom: startZoom, maxZoom: 10, minZoom: 1
   });
   window._map = map;
 
@@ -603,6 +615,12 @@ async function init() {
     
     loader.style.opacity = "0";
     setTimeout(() => { loader.style.display = "none"; }, 500);
+
+    if (hashParams.art) {
+      const wanted = hashParams.art.toLowerCase();
+      const hit = state.species.find(sp => sp.sciName.toLowerCase() === wanted);
+      if (hit) setTimeout(() => selectSpecies(hit.id), 600);
+    }
   });
 
   map.on("moveend", renderMarkers);

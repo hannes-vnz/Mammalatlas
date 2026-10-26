@@ -4,103 +4,184 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Mammal Atlas · Insights</title>
-<meta name="description" content="Wo leben die meisten Säugetierarten, wo die meisten bedrohten? Hotspot-Karte und Statistiken zu über 5.400 Arten." />
+<meta name="description" content="Hotspots, Endemismus und Bedrohung der Säugetiere: interaktive Analyse von über 5.400 Arten mit Region-Explorer, 3D-Ansicht und Statistiken." />
 <meta property="og:title" content="Mammal Atlas · Insights" />
-<meta property="og:description" content="Artenvielfalt-Hotspots und Schutzstatus der Säugetiere im Überblick." />
+<meta property="og:description" content="Wo leben die meisten Säugetierarten, wo sind sie am stärksten bedroht? Interaktive Hotspot-Karte mit Region-Explorer." />
 <meta property="og:type" content="website" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%8A%3C/text%3E%3C/svg%3E" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
 <style>
-  :root { --bg:#0d1117; --panel:#161b22; --panel-2:#1f2630; --border:#30363d; --border-soft:#21262d; --text:#e6edf3; --text-dim:#7d8590; --accent:#f0b429; }
+  :root { --bg:#0d1117; --panel:#161b22; --panel-2:#1f2630; --border:#30363d; --border-soft:#21262d; --text:#e6edf3; --text-dim:#7d8590; --accent:#f0b429; --red:#ef4444; --grey:#4b5563; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; scroll-padding-top: 64px; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
   a { color: var(--accent); }
-  header { display: flex; justify-content: space-between; align-items: center; padding: 18px clamp(16px, 4vw, 48px); border-bottom: 1px solid var(--border-soft); }
+  button, select, input { font: inherit; color: inherit; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 16px clamp(16px, 4vw, 48px); }
   header .brand { font-weight: 600; } header .brand span { color: var(--accent); margin-right: 6px; }
-  header a { font-size: 13px; text-decoration: none; border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; }
-  header a:hover { border-color: var(--accent); }
-  main { max-width: 1100px; margin: 0 auto; padding: 32px clamp(16px, 4vw, 48px) 60px; }
-  h1 { font-size: clamp(24px, 4vw, 34px); letter-spacing: -0.02em; margin-bottom: 8px; }
-  .lead { color: var(--text-dim); max-width: 640px; margin-bottom: 28px; }
-  h2 { font-size: 16px; margin: 40px 0 6px; } .sub { font-size: 12px; color: var(--text-dim); margin-bottom: 14px; }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
-  .kpi { background: var(--panel); border: 1px solid var(--border-soft); border-radius: 10px; padding: 16px; }
-  .kpi strong { display: block; font-size: 28px; color: var(--accent); font-weight: 600; letter-spacing: -0.02em; }
+  .btn { background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 7px 13px; font-size: 12px; cursor: pointer; text-decoration: none; color: var(--text); display: inline-block; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  nav.sub { position: sticky; top: 0; z-index: 20; background: rgba(13,17,23,.88); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border-soft); display: flex; gap: 4px; padding: 8px clamp(16px, 4vw, 48px); overflow-x: auto; white-space: nowrap; }
+  nav.sub a { color: var(--text-dim); text-decoration: none; font-size: 12px; padding: 6px 12px; border-radius: 6px; }
+  nav.sub a:hover { color: var(--text); background: var(--panel); }
+  main { max-width: 1160px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 48px) 60px; }
+  section { margin-bottom: 56px; }
+  h1 { font-size: clamp(26px, 4.2vw, 40px); letter-spacing: -0.025em; line-height: 1.15; margin-bottom: 10px; }
+  .lead { color: var(--text-dim); max-width: 660px; margin-bottom: 26px; }
+  h2 { font-size: 20px; letter-spacing: -0.01em; margin-bottom: 4px; }
+  h3 { font-size: 14px; margin-bottom: 4px; }
+  .sub { font-size: 12.5px; color: var(--text-dim); margin-bottom: 16px; max-width: 720px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .kpi { background: var(--panel); border: 1px solid var(--border-soft); border-radius: 12px; padding: 16px; }
+  .kpi strong { display: block; font-size: 28px; color: var(--accent); font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
   .kpi span { font-size: 12px; color: var(--text-dim); }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; } @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
-  .card { background: var(--panel); border: 1px solid var(--border-soft); border-radius: 10px; padding: 18px; }
-  .card h2 { margin-top: 0; }
-  .bar-row { display: grid; grid-template-columns: 150px 1fr 74px; gap: 10px; align-items: center; font-size: 12px; padding: 4px 0; }
+  .card { background: var(--panel); border: 1px solid var(--border-soft); border-radius: 12px; padding: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; } @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; margin-bottom: 14px; }
+  .ctl { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-dim); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { background: transparent; border: none; color: var(--text-dim); padding: 8px 13px; font-size: 12px; cursor: pointer; }
+  .seg button.active { background: var(--accent); color: #1a1207; font-weight: 600; }
+  select { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; max-width: 220px; }
+  .mapwrap { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: stretch; } @media (max-width: 980px) { .mapwrap { grid-template-columns: 1fr; } }
+  .mapbox { position: relative; }
+  #map { width: 100%; height: 560px; border-radius: 12px; border: 1px solid var(--border-soft); background: var(--panel); }
+  @media (max-width: 800px) { #map { height: 440px; } }
+  #busy { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(13,17,23,.55); border-radius: 12px; font-size: 13px; color: var(--text); z-index: 5; }
+  #busy.on { display: flex; }
+  .scale { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text-dim); margin-top: 10px; flex-wrap: wrap; }
+  .scale .ramp { flex: 0 0 180px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #3a3216, #8a6a14, #f0b429, #ffd978, #fff6d6); }
+  #explorer { background: var(--panel); border: 1px solid var(--border-soft); border-radius: 12px; padding: 16px; max-height: 560px; overflow-y: auto; font-size: 13px; }
+  @media (max-width: 980px) { #explorer { max-height: none; } }
+  #explorer .hint { color: var(--text-dim); font-size: 12.5px; }
+  #explorer .stats { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; }
+  .pill { background: var(--panel-2); border-radius: 999px; padding: 3px 10px; font-size: 11.5px; }
+  .pill b { color: var(--accent); font-weight: 600; }
+  .splist { list-style: none; display: grid; gap: 2px; }
+  .splist li a, .splist li > div { display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; padding: 5px 4px; border-radius: 8px; text-decoration: none; color: var(--text); }
+  .splist li a:hover { background: var(--panel-2); }
+  .thumb { width: 38px; height: 38px; border-radius: 8px; background: var(--panel-2) center/cover no-repeat; display: flex; align-items: center; justify-content: center; font-size: 16px; position: relative; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+  .sp-name { font-size: 12.5px; line-height: 1.25; } .sp-sci { font-size: 11px; color: var(--text-dim); font-style: italic; }
+  .sp-meta { font-size: 11px; color: var(--text-dim); text-align: right; white-space: nowrap; }
+  .mini { display: grid; grid-template-columns: 90px 1fr 26px; gap: 8px; align-items: center; font-size: 11px; margin: 3px 0; }
+  .toprow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .toprow button { background: var(--panel); border: 1px solid var(--border-soft); border-radius: 8px; padding: 7px 11px; font-size: 12px; cursor: pointer; text-align: left; }
+  .toprow button:hover { border-color: var(--accent); }
+  .toprow b { color: var(--accent); }
+  .bar-row { display: grid; grid-template-columns: 150px 1fr 74px; gap: 10px; align-items: center; font-size: 12px; padding: 4px 6px; border-radius: 6px; }
+  .bar-row.click { cursor: pointer; } .bar-row.click:hover { background: var(--panel-2); }
   .bar-row .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bar-row .val { text-align: right; color: var(--text-dim); font-variant-numeric: tabular-nums; }
   .track { height: 14px; background: var(--panel-2); border-radius: 4px; overflow: hidden; display: flex; }
   .track i { display: block; height: 100%; }
-  .legend-inline { display: flex; gap: 14px; font-size: 11px; color: var(--text-dim); margin-top: 10px; }
+  .legend-inline { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--text-dim); margin-top: 10px; }
   .legend-inline b { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
-  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
-  .seg button { background: transparent; border: none; color: var(--text-dim); padding: 8px 14px; font-size: 12px; cursor: pointer; }
-  .seg button.active { background: var(--accent); color: #1a1207; font-weight: 600; }
-  #map { width: 100%; height: 520px; border-radius: 10px; border: 1px solid var(--border-soft); background: var(--panel); }
-  @media (max-width: 800px) { #map { height: 420px; } }
-  .scale { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text-dim); margin-top: 10px; }
-  .scale .ramp { flex: 0 0 180px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #3a3216, #8a6a14, #f0b429, #ffd978, #fff6d6); }
-  .note { font-size: 11px; color: var(--text-dim); margin-top: 14px; max-width: 760px; }
-  #status { color: var(--text-dim); font-size: 13px; padding: 40px 0; text-align: center; }
-  #status.error { color: #ef4444; }
+  .donutwrap { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .donutwrap ul { list-style: none; font-size: 12px; display: grid; gap: 3px; }
+  svg text { fill: var(--text-dim); font-size: 11px; font-family: inherit; }
+  .chart { position: relative; }
+  .tip { position: absolute; pointer-events: none; background: #fff; color: #0d1117; font-size: 11.5px; padding: 4px 8px; border-radius: 6px; display: none; white-space: nowrap; z-index: 3; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; color: var(--text-dim); font-weight: 500; font-size: 11.5px; padding: 8px 10px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
+  th:hover { color: var(--accent); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tablewrap { overflow-x: auto; }
+  .tools { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 10px; }
+  input[type=search] { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px; min-width: 220px; }
+  .note { font-size: 11.5px; color: var(--text-dim); margin-top: 16px; max-width: 800px; }
+  #status { color: var(--text-dim); font-size: 13px; padding: 60px 0; text-align: center; }
+  #status.error { color: var(--red); }
+  #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #1a1207; padding: 8px 16px; border-radius: 8px; font-size: 12.5px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 50; }
+  #toast.on { opacity: 1; }
   footer { border-top: 1px solid var(--border-soft); padding: 18px clamp(16px, 4vw, 48px); font-size: 11px; color: var(--text-dim); text-align: center; }
   footer a { color: var(--text-dim); }
+  code { background: var(--panel-2); padding: 2px 6px; border-radius: 4px; }
 </style>
 </head>
 <body>
 <header>
   <div class="brand"><span>◈</span>Mammal Atlas · Insights</div>
-  <a href="./">← Zurück zum Atlas</a>
+  <a class="btn" href="./">← Zurück zum Atlas</a>
 </header>
+<nav class="sub" id="subnav" hidden>
+  <a href="#overview">Überblick</a><a href="#hotspots">Hotspots</a><a href="#latitude">Breitengrad</a><a href="#status-section">Status &amp; Ordnungen</a><a href="#ranges">Verbreitungsgebiete</a><a href="#families">Familien</a>
+</nav>
 
 <main>
-  <h1>Wo leben Säugetiere, und wo sind sie in Gefahr?</h1>
-  <p class="lead">Auswertung aller Arten des Atlas: Schutzstatus, Ordnungen und eine Hotspot-Karte der Artenvielfalt.</p>
-
   <div id="status">Lade Daten …</div>
-
   <div id="content" hidden>
+
+  <section id="overview">
+    <h1>Wo leben Säugetiere, und wo sind sie in Gefahr?</h1>
+    <p class="lead">Eine interaktive Auswertung aller Arten des Atlas: Artenvielfalt, Bedrohung und Endemismus als Karte, dazu Statistiken zu Schutzstatus, Ordnungen und Verbreitungsgebieten.</p>
     <div class="kpis" id="kpis"></div>
+  </section>
 
-    <h2>Hotspots</h2>
-    <p class="sub">Anzahl der Arten, deren Verbreitungsgebiet eine Zelle von 2° × 2° (ca. 220 km) überdeckt.</p>
-    <div class="seg" id="mode">
-      <button class="active" data-mode="all">Alle Arten</button>
-      <button data-mode="thr">Bedrohte Arten (VU · EN · CR)</button>
+  <section id="hotspots">
+    <h2>Hotspot-Karte</h2>
+    <p class="sub">Klicke auf eine Zelle, um die Arten dieser Region zu sehen. Mit den Filtern lässt sich z. B. nur eine Ordnung betrachten, die 3D-Ansicht macht Unterschiede greifbar.</p>
+    <div class="controls">
+      <div class="ctl">Darstellung<div class="seg" id="modeSeg"></div></div>
+      <div class="ctl">Ordnung<select id="orderSel"></select></div>
+      <div class="ctl">Zellgröße<select id="cellSel"><option value="2">2° (ca. 220 km)</option><option value="4">4° (ca. 440 km)</option></select></div>
+      <div class="ctl">Ansicht<div class="seg" id="viewSeg"><button data-view="2d" class="active">2D</button><button data-view="3d">3D</button></div></div>
+      <div class="ctl">&nbsp;<span><button class="btn" id="randomBtn">🎲 Zufälliger Hotspot</button> <button class="btn" id="csvBtn">⬇ CSV</button> <button class="btn" id="shareBtn">🔗 Link</button></span></div>
     </div>
-    <div id="map"></div>
-    <div class="scale"><span id="scale-min">1</span><div class="ramp"></div><span id="scale-max"></span><span id="scale-label"></span></div>
+    <div class="mapwrap">
+      <div class="mapbox"><div id="map"></div><div id="busy">Berechne Raster …</div></div>
+      <aside id="explorer"><h3>Region-Explorer</h3><p class="hint">Klicke auf die Karte, dann erscheinen hier die Arten der Region mit Schutzstatus, Foto und Link in den Atlas.</p></aside>
+    </div>
+    <div class="scale"><span id="scale-min">0</span><div class="ramp"></div><span id="scale-max"></span><span id="scale-label"></span></div>
+    <div class="toprow" id="toprow"></div>
+  </section>
 
+  <section id="latitude">
+    <h2>Artenvielfalt nach Breitengrad</h2>
+    <p class="sub">Wie viele Arten kommen in einem Breitengrad-Band vor? Der Verlauf folgt dem Filter der Hotspot-Karte (Ordnung, Zellgröße). Rot: davon bedroht.</p>
+    <div class="card chart" id="latChart"></div>
+  </section>
+
+  <section id="status-section">
+    <h2>Schutzstatus und Ordnungen</h2>
+    <p class="sub">Ein Klick auf eine Ordnung filtert die Hotspot-Karte.</p>
     <div class="grid2">
-      <div class="card">
-        <h2>Schutzstatus</h2>
-        <p class="sub">Anzahl Arten je IUCN-Kategorie</p>
-        <div id="chart-status"></div>
-      </div>
-      <div class="card">
-        <h2>Größte Ordnungen</h2>
-        <p class="sub">Arten je Ordnung, davon bedroht (VU · EN · CR)</p>
-        <div id="chart-orders"></div>
-        <div class="legend-inline"><span><b style="background:#ef4444"></b>bedroht</span><span><b style="background:#4b5563"></b>nicht bedroht</span></div>
-      </div>
+      <div class="card"><h3>Schutzstatus</h3><div class="donutwrap" id="donut"></div></div>
+      <div class="card"><h3>Größte Ordnungen</h3><p class="sub" style="margin-bottom:8px">Arten je Ordnung, davon bedroht (VU · EN · CR)</p><div id="chart-orders"></div>
+        <div class="legend-inline"><span><b style="background:#ef4444"></b>bedroht</span><span><b style="background:#4b5563"></b>nicht bedroht</span></div></div>
     </div>
+    <div class="card" style="margin-top:20px"><h3>Welche Ordnungen sind am stärksten bedroht?</h3><p class="sub" style="margin-bottom:8px">Anteil bedrohter Arten, nur Ordnungen mit mindestens 40 Arten</p><div id="chart-share"></div></div>
+  </section>
 
-    <div class="card" style="margin-top:24px">
-      <h2>Welche Ordnungen sind am stärksten bedroht?</h2>
-      <p class="sub">Anteil bedrohter Arten (VU · EN · CR), nur Ordnungen mit mindestens 40 Arten</p>
-      <div id="chart-share"></div>
+  <section id="ranges">
+    <h2>Verbreitungsgebiete</h2>
+    <p class="sub">Die Größe des Verbreitungsgebiets (Näherung aus den Polygonen, in km²) ist einer der wichtigsten Risikofaktoren: kleine Areale sind verwundbar.</p>
+    <div class="grid2">
+      <div class="card"><h3>Verteilung der Gebietsgrößen</h3><p class="sub" style="margin-bottom:8px">Anzahl Arten je Größenklasse (logarithmische Achse)</p><div class="chart" id="histChart"></div>
+        <div class="legend-inline"><span><b style="background:#ef4444"></b>bedroht</span><span><b style="background:#4b5563"></b>nicht bedroht</span></div></div>
+      <div class="card"><h3>Mittleres Gebiet je Schutzstatus</h3><p class="sub" style="margin-bottom:8px">Median in km², logarithmische Skala</p><div id="medianChart"></div></div>
     </div>
+    <div class="grid2" style="margin-top:20px">
+      <div class="card"><h3>Kleinste Verbreitungsgebiete</h3><ul class="splist" id="smallList"></ul></div>
+      <div class="card"><h3>Größte Verbreitungsgebiete</h3><ul class="splist" id="largeList"></ul></div>
+    </div>
+  </section>
 
-    <p class="note">Hinweis: Die Hotspots basieren auf den Verbreitungspolygonen des Datensatzes und zeigen, wo Gebiete liegen, nicht gezählte Individuen. Gebiete, die sich über mehr als 180° Länge erstrecken (meist Polygone über den 180°-Meridian), werden bei der Rasterung ausgelassen. Arten ohne Verbreitungspolygon fehlen in der Karte, zählen aber in den Statistiken.</p>
+  <section id="families">
+    <h2>Familien im Vergleich</h2>
+    <div class="tools"><p class="sub" style="margin:0">Spalten anklicken zum Sortieren.</p><input type="search" id="famSearch" placeholder="Familie oder Ordnung suchen …" /></div>
+    <div class="card tablewrap"><table><thead id="famHead"></thead><tbody id="famBody"></tbody></table></div>
+    <p style="margin-top:10px"><button class="btn" id="famMore">Alle Familien anzeigen</button></p>
+  </section>
+
+  <p class="note">Hinweise: Grundlage sind die Verbreitungspolygone des Datensatzes. Sie zeigen, wo Gebiete liegen, nicht gezählte Individuen. Bei der Rasterung zählt jede Art je Zelle einmal (Zellmittelpunkt oder Eckpunkt im Gebiet). Gebiete über die 180°-Datumsgrenze (40 Polygone) werden ausgelassen. Der Endemismus-Index verteilt je Art ein Gewicht von 1 gleichmäßig auf ihre Zellen: eine Art, die nur eine Zelle besiedelt, zählt voll, eine weit verbreitete kaum. Arten ohne Polygon fehlen in der Karte, zählen aber in den Statistiken.</p>
   </div>
 </main>
+<div id="toast"></div>
 
 <footer>
-  Karte: © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap-Mitwirkende</a>
+  Karte: © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap-Mitwirkende</a> · Bilder: Wikimedia Commons (Lizenz je Bild im Atlas verlinkt)
   <!-- TODO: Quelle und Lizenz der Verbreitungsdaten und des Schutzstatus hier ergänzen -->
 </footer>
 
@@ -254,23 +335,49 @@ function pickMarkers(list, view, project, opts) {
   return out;
 }
 
-// Artenvielfalt als Raster (Scanline-Fuellung je Polygon, jede Art zaehlt je Zelle einmal)
-// species: [{range, ...}], cell in Grad, pass: Funktion(sp) -> bool; Gebiete >180 Grad Breite werden ausgelassen
-function richnessGrid(species, cell, pass) {
+/* ATLAS-CORE-END */
+
+/* ATLAS-RASTER-START: Flaechen und Artenvielfalt-Raster (nur Insights-Seite) */
+// Verbreitungsgebiet in km2 (flaechentreue Naeherung ueber lng*cos(lat)); NaN bei Gebieten ueber den 180-Grad-Meridian
+function rangeAreaKm2(range) {
+  let total = 0;
+  for (let r = 0; r < range.rings.length; r++) {
+    const b = range.boxes[r];
+    if (b[2] - b[0] > 180) return NaN;
+    const ring = range.rings[r], n = ring.length;
+    let a = 0;
+    for (let i = 0, j = n - 2; i < n; j = i, i += 2) {
+      const xi = ring[i] * Math.cos(ring[i + 1] * Math.PI / 180), xj = ring[j] * Math.cos(ring[j + 1] * Math.PI / 180);
+      a += xj * ring[i + 1] - xi * ring[j + 1];
+    }
+    total += Math.abs(a) / 2;
+  }
+  return total * 111.32 * 111.32;
+}
+
+// Rastert alle Arten in einem Durchgang: Artenzahl, bedrohte Arten, Endemismus-Index (Summe 1/Zellenzahl) und Breitengrad-Profil.
+// Jede Art zaehlt je Zelle einmal (Scanline-Fuellung plus Zellen mit Eckpunkten).
+function rasterize(species, cell, isThreatened) {
   const W = Math.round(360 / cell), H = Math.round(180 / cell);
-  const counts = new Uint16Array(W * H), stamp = new Int32Array(W * H);
+  const all = new Uint16Array(W * H), thr = new Uint16Array(W * H), endem = new Float32Array(W * H);
+  const latAll = new Uint16Array(H), latThr = new Uint16Array(H);
+  const stamp = new Int32Array(W * H), rowStamp = new Int32Array(H);
   let sid = 0, skipped = 0;
   for (const sp of species) {
-    if (!sp.range || (pass && !pass(sp))) continue;
+    if (!sp.range) continue;
     sid++;
+    const t = isThreatened(sp), hit = [];
+    const mark = (i, j) => {
+      if (i < 0 || i >= W || j < 0 || j >= H) return;
+      const k = j * W + i;
+      if (stamp[k] === sid) return;
+      stamp[k] = sid; all[k]++; hit.push(k);
+      if (t) thr[k]++;
+      if (rowStamp[j] !== sid) { rowStamp[j] = sid; latAll[j]++; if (t) latThr[j]++; }
+    };
     for (let r = 0; r < sp.range.rings.length; r++) {
       const ring = sp.range.rings[r], b = sp.range.boxes[r];
       if (b[2] - b[0] > 180) { skipped++; continue; }
-      const mark = (i, j) => {
-        if (i < 0 || i >= W || j < 0 || j >= H) return;
-        const k = j * W + i;
-        if (stamp[k] !== sid) { stamp[k] = sid; counts[k]++; }
-      };
       const j0 = Math.max(0, Math.floor((b[1] + 90) / cell)), j1 = Math.min(H - 1, Math.floor((b[3] + 90) / cell));
       const rows = new Array(j1 - j0 + 1);
       for (let i = 0; i < rows.length; i++) rows[i] = [];
@@ -294,10 +401,27 @@ function richnessGrid(species, cell, pass) {
         }
       }
     }
+    // Endemismus: jede Art verteilt ein Gewicht von 1 gleichmaessig auf ihre Zellen
+    if (hit.length) { const w = 1 / hit.length; for (const k of hit) endem[k] += w; }
   }
-  return { counts, W, H, cell, skipped };
+  return { all, thr, endem, latAll, latThr, W, H, cell, skipped };
 }
-/* ATLAS-CORE-END */
+
+// Deckt die Art die Zelle (i, j) ab? Gleiches Kriterium wie rasterize().
+function coversCell(range, cell, i, j) {
+  const x0 = -180 + i * cell, y0 = -90 + j * cell, x1 = x0 + cell, y1 = y0 + cell, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  for (let r = 0; r < range.rings.length; r++) {
+    const b = range.boxes[r];
+    if (b[2] - b[0] > 180 || b[0] > x1 || b[2] < x0 || b[1] > y1 || b[3] < y0) continue;
+    const ring = range.rings[r];
+    if (pointInRing(cx, cy, ring)) return true;
+    for (let k = 0; k < ring.length; k += 2) {
+      if (Math.floor((ring[k] + 180) / cell) === i && Math.floor((ring[k + 1] + 90) / cell) === j) return true;
+    }
+  }
+  return false;
+}
+/* ATLAS-RASTER-END */
 
 
 const CDN_URLS = [
@@ -316,11 +440,20 @@ const STATUS = {
   EW: ["Extinct in the Wild", "#c084fc"], EX: ["Extinct", "#f5f5f5"], DD: ["Data Deficient", "#94a3b8"]
 };
 const THREATENED = ["VU", "EN", "CR"];
-const fmt = n => n.toLocaleString("de-DE");
-const pct = (a, b) => (b ? (100 * a / b).toLocaleString("de-DE", { maximumFractionDigits: 1 }) : "0") + " %";
-const titleCase = s => s ? s.charAt(0) + s.slice(1).toLowerCase() : "";
+const isThr = s => THREATENED.includes(s.status);
 const $ = id => document.getElementById(id);
+const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = n => Math.round(n).toLocaleString("de-DE");
+const fmtDec = (n, d = 1) => n.toLocaleString("de-DE", { maximumFractionDigits: d });
+const pct = (a, b) => (b ? fmtDec(100 * a / b, 1) : "0") + " %";
+const titleCase = s => s ? s.charAt(0) + s.slice(1).toLowerCase() : "";
+const areaText = a => a < 10 ? fmtDec(a, 1) + " km²" : fmt(a) + " km²";
+const latText = v => Math.abs(v) + "°" + (v >= 0 ? "N" : "S");
+const lngText = v => Math.abs(v) + "°" + (v >= 0 ? "O" : "W");
+const median = arr => { if (!arr.length) return NaN; const a = [...arr].sort((x, y) => x - y), m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 1800); }
 
+let SP = [];
 async function loadSpecies() {
   const files = ["./data/species_part_1.txt", "./data/species_part_2.txt"];
   const texts = await Promise.all(files.map(f => fetch(f).then(r => { if (!r.ok) throw new Error("fehlt"); return r.text(); }).catch(() => "")));
@@ -331,66 +464,325 @@ async function loadSpecies() {
     for (let i = 1; i < lines.length; i++) {
       const l = lines[i].trim(); if (!l) continue;
       const c = l.split("\t");
-      out.push({ order: c[2], family: c[3], status: c[4], range: parseRange(c[8]) });
+      const range = parseRange(c[8]);
+      const sciName = (c[1] || "").replace(/_/g, " ");
+      out.push({
+        common: c[0] || sciName, sciName, order: c[2] || "", family: c[3] || "", status: c[4] || "",
+        img: c[5] && c[5].startsWith("https://") && !/Status_iucn/i.test(c[5]) ? c[5] : "",
+        range, area: range ? rangeAreaKm2(range) : NaN
+      });
     }
   }
   return out;
 }
 
-function barRow(name, value, max, segments, valText) {
-  const segs = segments.map(s => `<i style="width:${(100 * s.v / max).toFixed(2)}%;background:${s.c}"></i>`).join("");
-  return `<div class="bar-row"><div class="name" title="${name}">${name}</div><div class="track">${segs}</div><div class="val">${valText}</div></div>`;
-}
-
-function renderCharts(sp) {
-  const total = sp.length;
-  const thr = sp.filter(s => THREATENED.includes(s.status)).length;
-  const dd = sp.filter(s => s.status === "DD").length;
-  const orders = new Map(), families = new Set();
-  for (const s of sp) {
-    families.add(s.family);
-    const o = orders.get(s.order) || { n: 0, t: 0 }; o.n++; if (THREATENED.includes(s.status)) o.t++; orders.set(s.order, o);
+// ---------- Zustand ----------
+const S = { mode: "all", order: "", cell: 2, view: "2d" };
+const MODES = {
+  all:   { label: "Artenvielfalt",  unit: "Arten je Zelle",                                val: (g, k) => g.all[k] },
+  thr:   { label: "Bedrohte Arten", unit: "bedrohte Arten (VU · EN · CR) je Zelle",        val: (g, k) => g.thr[k] },
+  share: { label: "Anteil bedroht", unit: "% bedrohter Arten (ab 8 Arten je Zelle)",       val: (g, k) => g.all[k] >= 8 ? Math.round(100 * g.thr[k] / g.all[k]) : 0 },
+  endem: { label: "Endemismus",     unit: "Endemismus-Index (Artäquivalente je Zelle)",    val: (g, k) => Math.round(g.endem[k] * 10) / 10 }
+};
+const gridCache = new Map();
+function getGrid() {
+  const key = S.order + "|" + S.cell;
+  if (!gridCache.has(key)) {
+    const list = S.order ? SP.filter(s => s.order === S.order) : SP;
+    gridCache.set(key, Object.assign(rasterize(list, S.cell, isThr), { list }));
   }
-  $("kpis").innerHTML = [
-    [fmt(total), "Arten im Atlas"],
-    [fmt(thr), "bedroht (VU · EN · CR), " + pct(thr, total)],
-    [fmt(dd), "unzureichende Datenlage (DD), " + pct(dd, total)],
-    [fmt(orders.size) + " / " + fmt(families.size), "Ordnungen / Familien"]
-  ].map(k => `<div class="kpi"><strong>${k[0]}</strong><span>${k[1]}</span></div>`).join("");
-
-  // Status
-  const counts = {}; sp.forEach(s => counts[s.status] = (counts[s.status] || 0) + 1);
-  const maxS = Math.max(...Object.values(counts));
-  $("chart-status").innerHTML = Object.keys(STATUS).filter(k => counts[k]).map(k =>
-    barRow(`${k} · ${STATUS[k][0]}`, counts[k], maxS, [{ v: counts[k], c: STATUS[k][1] }], `${fmt(counts[k])}`)).join("");
-
-  // Groesste Ordnungen
-  const top = [...orders.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 10);
-  const maxO = top[0][1].n;
-  $("chart-orders").innerHTML = top.map(([name, o]) =>
-    barRow(titleCase(name), o.n, maxO, [{ v: o.t, c: "#ef4444" }, { v: o.n - o.t, c: "#4b5563" }], fmt(o.n))).join("");
-
-  // Anteil bedroht
-  const share = [...orders.entries()].filter(([, o]) => o.n >= 40).map(([name, o]) => [name, o, o.t / o.n]).sort((a, b) => b[2] - a[2]).slice(0, 10);
-  $("chart-share").innerHTML = share.map(([name, o, r]) =>
-    barRow(titleCase(name), r, 1, [{ v: r, c: "#ef4444" }], `${pct(o.t, o.n)}`)).join("");
+  return gridCache.get(key);
+}
+function syncHash() {
+  const p = [];
+  if (S.mode !== "all") p.push("mode=" + S.mode);
+  if (S.order) p.push("order=" + encodeURIComponent(S.order));
+  if (S.cell !== 2) p.push("cell=" + S.cell);
+  if (S.view !== "2d") p.push("view=" + S.view);
+  try { history.replaceState(null, "", location.pathname + location.search + (p.length ? "#" + p.join("&") : "")); } catch (e) {}
+}
+function readHash() {
+  location.hash.replace(/^#/, "").split("&").forEach(p => {
+    const i = p.indexOf("="); if (i < 0) return;
+    const k = p.slice(0, i); let v = ""; try { v = decodeURIComponent(p.slice(i + 1)); } catch (e) { return; }
+    if (k === "mode" && MODES[v]) S.mode = v;
+    if (k === "order" && SP.some(s => s.order === v)) S.order = v;
+    if (k === "cell" && (v === "2" || v === "4")) S.cell = Number(v);
+    if (k === "view" && (v === "2d" || v === "3d")) S.view = v;
+  });
 }
 
-function gridToGeoJSON(g) {
-  const features = [];
-  for (let j = 0; j < g.H; j++) for (let i = 0; i < g.W; i++) {
-    const n = g.counts[j * g.W + i]; if (!n) continue;
-    const x0 = -180 + i * g.cell, y0 = -90 + j * g.cell, x1 = x0 + g.cell, y1 = y0 + g.cell;
-    features.push({ type: "Feature", properties: { n }, geometry: { type: "Polygon", coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] } });
-  }
-  return { type: "FeatureCollection", features };
+// ---------- Uebersicht ----------
+function animateTo(el, to) {
+  if (typeof requestAnimationFrame !== "function") { el.textContent = fmt(to); return; }
+  const t0 = performance.now(), dur = 900;
+  const step = now => { const f = Math.min(1, (now - t0) / dur); el.textContent = fmt(to * (1 - Math.pow(1 - f, 3))); if (f < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
 }
-function maxOf(g) { let m = 0; for (let k = 0; k < g.counts.length; k++) if (g.counts[k] > m) m = g.counts[k]; return m; }
+function renderKpis() {
+  const total = SP.length, thr = SP.filter(isThr).length, dd = SP.filter(s => s.status === "DD").length;
+  const areas = SP.map(s => s.area).filter(a => a > 0);
+  const small = areas.filter(a => a < 10000).length;
+  const orders = new Set(SP.map(s => s.order)).size, fams = new Set(SP.map(s => s.family)).size;
+  const tiles = [
+    [total, "Arten im Atlas"], [thr, "bedroht (VU · EN · CR), " + pct(thr, total)], [dd, "unzureichende Datenlage (DD), " + pct(dd, total)],
+    [Math.round(median(areas)), "km² mittleres Verbreitungsgebiet (Median)"], [small, "Arten mit weniger als 10.000 km² Gebiet, " + pct(small, areas.length)], [null, "Ordnungen / Familien", orders + " / " + fams]
+  ];
+  $("kpis").innerHTML = tiles.map(t => `<div class="kpi"><strong ${t[0] == null ? "" : `data-to="${t[0]}"`}>${t[0] == null ? esc(t[2]) : 0}</strong><span>${esc(t[1])}</span></div>`).join("");
+  document.querySelectorAll(".kpi strong[data-to]").forEach(el => animateTo(el, Number(el.dataset.to)));
+}
+
+// ---------- Hotspot-Karte ----------
+let map = null, mapReady = false, sel = null, popup = null;
+const COLORS = ["#3a3216", "#8a6a14", "#f0b429", "#ffd978", "#fff6d6"];
 function colorExpr(max) {
-  const fr = [0, 0.12, 0.35, 0.65, 1], cols = ["#3a3216", "#8a6a14", "#f0b429", "#ffd978", "#fff6d6"];
-  const stops = []; let last = 0;
-  fr.forEach((f, i) => { const v = Math.max(last + 1, Math.round(1 + f * (max - 1))); stops.push(v, cols[i]); last = v; });
+  const fr = [0, 0.12, 0.35, 0.65, 1], stops = []; let last = -Infinity;
+  fr.forEach((f, i) => {
+    let v = f === 0 ? Math.max(1e-6, Math.min(1, max * 0.02)) : max * f;
+    if (v <= last) v = last + Math.max(max * 0.002, 1e-6);
+    stops.push(v, COLORS[i]); last = v;
+  });
   return ["interpolate", ["linear"], ["get", "n"], ...stops];
+}
+function gridGeoJSON(g) {
+  const m = MODES[S.mode], features = []; let max = 0;
+  for (let k = 0; k < g.all.length; k++) {
+    const v = m.val(g, k); if (!(v > 0)) continue;
+    if (v > max) max = v;
+    const i = k % g.W, j = Math.floor(k / g.W), x0 = -180 + i * g.cell, y0 = -90 + j * g.cell, x1 = x0 + g.cell, y1 = y0 + g.cell;
+    features.push({ type: "Feature", properties: { n: v, all: g.all[k], thr: g.thr[k] }, geometry: { type: "Polygon", coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] } });
+  }
+  return { data: { type: "FeatureCollection", features }, max };
+}
+function topCells(g, n) {
+  const m = MODES[S.mode], arr = [];
+  for (let k = 0; k < g.all.length; k++) { const v = m.val(g, k); if (v > 0) arr.push([v, k]); }
+  arr.sort((a, b) => b[0] - a[0]);
+  return arr.slice(0, n).map(([v, k]) => ({ v, i: k % g.W, j: Math.floor(k / g.W) }));
+}
+function cellCenter(c, g) { return [-180 + (c.i + 0.5) * g.cell, -90 + (c.j + 0.5) * g.cell]; }
+
+function updateMap(g) {
+  const { data, max } = gridGeoJSON(g), m = MODES[S.mode];
+  $("scale-max").textContent = fmtDec(max, S.mode === "endem" ? 1 : 0);
+  $("scale-min").textContent = S.mode === "endem" ? "> 0" : "1";
+  $("scale-label").textContent = m.unit;
+  if (!mapReady) return;
+  map.getSource("rich").setData(data);
+  const ce = colorExpr(max || 1);
+  map.setPaintProperty("rich-fill", "fill-color", ce);
+  map.setPaintProperty("rich-3d", "fill-extrusion-color", ce);
+  map.setPaintProperty("rich-3d", "fill-extrusion-height", ["*", ["get", "n"], (g.cell * 180000) / (max || 1)]);
+}
+function applyView() {
+  document.querySelectorAll("#viewSeg button").forEach(b => b.classList.toggle("active", b.dataset.view === S.view));
+  if (!mapReady) return;
+  const d3 = S.view === "3d";
+  map.setLayoutProperty("rich-fill", "visibility", d3 ? "none" : "visible");
+  map.setLayoutProperty("rich-3d", "visibility", d3 ? "visible" : "none");
+  map.easeTo({ pitch: d3 ? 55 : 0, bearing: d3 ? -12 : 0, duration: 900 });
+}
+function renderTop(g) {
+  const cells = topCells(g, 6);
+  $("toprow").innerHTML = cells.length ? "<span class='sub' style='margin:0;align-self:center'>Top-Zellen:</span>" + cells.map((c, n) => {
+    const [lng, lat] = cellCenter(c, g);
+    return `<button data-i="${c.i}" data-j="${c.j}">${n + 1}. <b>${fmtDec(c.v, S.mode === "endem" ? 1 : 0)}</b> · ${latText(lat)}, ${lngText(lng)}</button>`;
+  }).join("") : "";
+  $("toprow").querySelectorAll("button").forEach(b => b.addEventListener("click", () => gotoCell(Number(b.dataset.i), Number(b.dataset.j))));
+}
+function gotoCell(i, j) {
+  const g = getGrid(), c = { i, j }, [lng, lat] = cellCenter(c, g);
+  if (mapReady) map.flyTo({ center: [lng, lat], zoom: 4.2, duration: 1400 });
+  openCell(i, j);
+}
+function speciesRow(sp, meta) {
+  const dot = `<span class="dot" style="background:${(STATUS[sp.status] || ["", "#888"])[1]}"></span>`;
+  const thumb = sp.img ? `<div class="thumb" style="background-image:url('${esc(sp.img)}')"></div>` : `<div class="thumb">🐾</div>`;
+  return `<li><a href="./#art=${encodeURIComponent(sp.sciName)}" title="Im Atlas öffnen"><span>${thumb}</span><span><div class="sp-name">${dot}${esc(sp.common)}</div><div class="sp-sci">${esc(sp.sciName)}</div></span><span class="sp-meta">${esc(meta)}</span></a></li>`;
+}
+function openCell(i, j) {
+  sel = { i, j };
+  const g = getGrid(), x0 = -180 + i * g.cell, y0 = -90 + j * g.cell, x1 = x0 + g.cell, y1 = y0 + g.cell;
+  if (mapReady && map.getSource("sel")) map.getSource("sel").setData({ type: "Feature", geometry: { type: "Polygon", coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] } });
+  const list = g.list.filter(s => s.range && coversCell(s.range, g.cell, i, j));
+  const sev = { CR: 7, EN: 6, VU: 5, NT: 4, EW: 3, LC: 2, DD: 1, EX: 0 };
+  list.sort((a, b) => (sev[b.status] - sev[a.status]) || a.common.localeCompare(b.common));
+  const thr = list.filter(isThr).length, byOrder = {};
+  list.forEach(s => byOrder[s.order] = (byOrder[s.order] || 0) + 1);
+  const topO = Object.entries(byOrder).sort((a, b) => b[1] - a[1]).slice(0, 5), maxO = topO.length ? topO[0][1] : 1;
+  const [cx, cy] = [(x0 + x1) / 2, (y0 + y1) / 2];
+  $("explorer").innerHTML = `<h3>${latText(y0)}–${latText(y1)}, ${lngText(x0)}–${lngText(x1)}</h3>
+    <div class="stats"><span class="pill"><b>${fmt(list.length)}</b> Arten</span><span class="pill"><b>${fmt(thr)}</b> bedroht</span><span class="pill"><b>${list.length ? fmtDec(100 * thr / list.length, 0) : 0} %</b> Anteil</span></div>
+    ${list.length ? topO.map(([o, n]) => `<div class="mini"><span>${esc(titleCase(o))}</span><div class="track"><i style="width:${100 * n / maxO}%;background:#f0b429"></i></div><span>${n}</span></div>`).join("") : `<p class="hint">In dieser Zelle liegt kein Verbreitungsgebiet${S.order ? " der gewählten Ordnung" : ""}.</p>`}
+    ${list.length ? `<p style="margin:12px 0 6px"><a href="./#view=${cx},${cy},5" style="font-size:12px">Region im Atlas öffnen →</a></p>
+    <ul class="splist">${list.slice(0, 40).map(s => speciesRow(s, s.status)).join("")}</ul>${list.length > 40 ? `<p class="hint" style="margin-top:8px">… und ${fmt(list.length - 40)} weitere (nach Gefährdung sortiert)</p>` : ""}` : ""}`;
+}
+function setupMap() {
+  map = new maplibregl.Map({ container: "map", style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json", center: [15, 15], zoom: 1.4, minZoom: 0.8, maxZoom: 7 });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
+  popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
+  map.on("load", () => {
+    map.addSource("rich", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addSource("sel", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "rich-fill", type: "fill", source: "rich", paint: { "fill-color": "#f0b429", "fill-opacity": 0.78 } });
+    map.addLayer({ id: "rich-3d", type: "fill-extrusion", source: "rich", layout: { visibility: "none" }, paint: { "fill-extrusion-color": "#f0b429", "fill-extrusion-height": 0, "fill-extrusion-opacity": 0.92 } });
+    map.addLayer({ id: "sel-line", type: "line", source: "sel", paint: { "line-color": "#ffffff", "line-width": 2 } });
+    mapReady = true;
+    ["rich-fill", "rich-3d"].forEach(id => {
+      map.on("mousemove", id, e => {
+        map.getCanvas().style.cursor = "pointer";
+        const p = e.features[0].properties;
+        popup.setLngLat(e.lngLat).setHTML(`<div style="color:#0d1117;font-size:12px"><b>${fmtDec(p.n, S.mode === "endem" ? 1 : 0)}</b> ${esc(MODES[S.mode].unit)}<br>${fmt(p.all)} Arten · ${fmt(p.thr)} bedroht</div>`).addTo(map);
+      });
+      map.on("mouseleave", id, () => { map.getCanvas().style.cursor = ""; popup.remove(); });
+    });
+    map.on("click", e => {
+      const g = getGrid(), lng = ((e.lngLat.lng + 180) % 360 + 360) % 360;
+      const i = Math.floor(lng / g.cell), j = Math.floor((e.lngLat.lat + 90) / g.cell);
+      if (j >= 0 && j < g.H) openCell(i, j);
+    });
+    refresh();
+    applyView();
+  });
+}
+
+// ---------- Breitengrad ----------
+function renderLatitude(g) {
+  const W = 900, H = 300, m = { l: 46, r: 16, t: 22, b: 34 }, iw = W - m.l - m.r, ih = H - m.t - m.b, n = g.H;
+  let maxV = 1; for (let j = 0; j < n; j++) if (g.latAll[j] > maxV) maxV = g.latAll[j];
+  const X = lat => m.l + iw * (lat + 90) / 180, Y = v => m.t + ih * (1 - v / maxV), latOf = j => -90 + (j + 0.5) * g.cell;
+  let area = `M${X(latOf(0))},${Y(0)}`, line = "";
+  for (let j = 0; j < n; j++) area += ` L${X(latOf(j)).toFixed(1)},${Y(g.latAll[j]).toFixed(1)}`;
+  area += ` L${X(latOf(n - 1))},${Y(0)} Z`;
+  for (let j = 0; j < n; j++) line += `${j ? " L" : "M"}${X(latOf(j)).toFixed(1)},${Y(g.latThr[j]).toFixed(1)}`;
+  const grid = [0.25, 0.5, 0.75, 1].map(f => `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(maxV * f)}" y2="${Y(maxV * f)}" stroke="#21262d"/><text x="${m.l - 6}" y="${Y(maxV * f) + 4}" text-anchor="end">${fmt(maxV * f)}</text>`).join("");
+  const ticks = [-90, -60, -30, 0, 30, 60, 90].map(v => `<text x="${X(v)}" y="${H - 10}" text-anchor="middle">${v === 0 ? "Äquator" : Math.abs(v) + "°" + (v > 0 ? "N" : "S")}</text>`).join("");
+  const tropics = [-23.4, 23.4].map(v => `<line x1="${X(v)}" x2="${X(v)}" y1="${m.t}" y2="${m.t + ih}" stroke="#7d8590" stroke-dasharray="3 4" opacity=".6"/>`).join("") + `<text x="${X(23.4) + 4}" y="${m.t + 10}">Wendekreise</text>`;
+  $("latChart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Artenzahl nach Breitengrad">${grid}${tropics}<path d="${area}" fill="#f0b429" fill-opacity=".35" stroke="#f0b429" stroke-width="1.5"/><path d="${line}" fill="none" stroke="#ef4444" stroke-width="1.8"/>${ticks}<line id="latCursor" y1="${m.t}" y2="${m.t + ih}" stroke="#fff" opacity="0" /><rect id="latHit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/></svg><div class="tip" id="latTip"></div>`;
+  const hit = $("latHit"), tip = $("latTip"), cur = $("latCursor");
+  hit.addEventListener("mousemove", e => {
+    const r = hit.getBoundingClientRect(); if (!r.width) return;
+    const f = (e.clientX - r.left) / r.width, j = Math.max(0, Math.min(n - 1, Math.floor(f * n)));
+    const x = X(latOf(j)); cur.setAttribute("x1", x); cur.setAttribute("x2", x); cur.setAttribute("opacity", ".7");
+    tip.style.display = "block"; tip.style.left = Math.min(e.clientX - $("latChart").getBoundingClientRect().left + 12, $("latChart").clientWidth - 150) + "px"; tip.style.top = "8px";
+    tip.textContent = `${latText(-90 + j * g.cell)} bis ${latText(-90 + (j + 1) * g.cell)}: ${fmt(g.latAll[j])} Arten, ${fmt(g.latThr[j])} bedroht`;
+  });
+  hit.addEventListener("mouseleave", () => { tip.style.display = "none"; cur.setAttribute("opacity", "0"); });
+}
+
+// ---------- Status, Ordnungen ----------
+function barRow(name, segments, max, valText, attrs = "") {
+  const segs = segments.map(s => `<i style="width:${Math.max(0, 100 * s.v / max).toFixed(2)}%;background:${s.c}"></i>`).join("");
+  return `<div class="bar-row ${attrs ? "click" : ""}" ${attrs}><div class="name" title="${esc(name)}">${esc(name)}</div><div class="track">${segs}</div><div class="val">${valText}</div></div>`;
+}
+function filterOrder(o) { S.order = o; $("orderSel").value = o; refresh(); $("hotspots").scrollIntoView({ behavior: "smooth" }); }
+function renderStatusAndOrders() {
+  const total = SP.length, counts = {}; SP.forEach(s => counts[s.status] = (counts[s.status] || 0) + 1);
+  const keys = ["CR", "EN", "VU", "NT", "LC", "DD", "EW", "EX"].filter(k => counts[k]);
+  const R = 70, C = 2 * Math.PI * R; let off = 0;
+  const segs = keys.map(k => { const len = C * counts[k] / total; const s = `<circle r="${R}" cx="90" cy="90" fill="none" stroke="${STATUS[k][1]}" stroke-width="26" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 90 90)"><title>${esc(k)}: ${fmt(counts[k])}</title></circle>`; off += len; return s; }).join("");
+  $("donut").innerHTML = `<svg viewBox="0 0 180 180" width="180" height="180" role="img" aria-label="Verteilung der Schutzkategorien">${segs}<text x="90" y="88" text-anchor="middle" style="fill:#e6edf3;font-size:22px;font-weight:600">${fmt(total)}</text><text x="90" y="106" text-anchor="middle">Arten</text></svg>
+    <ul>${keys.map(k => `<li><span class="dot" style="background:${STATUS[k][1]}"></span>${k} · ${esc(STATUS[k][0])}: <b>${fmt(counts[k])}</b> <span style="color:var(--text-dim)">(${pct(counts[k], total)})</span></li>`).join("")}</ul>`;
+  const orders = new Map();
+  SP.forEach(s => { const o = orders.get(s.order) || { n: 0, t: 0 }; o.n++; if (isThr(s)) o.t++; orders.set(s.order, o); });
+  const top = [...orders.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 10), maxO = top[0][1].n;
+  $("chart-orders").innerHTML = top.map(([name, o]) => barRow(titleCase(name), [{ v: o.t, c: "#ef4444" }, { v: o.n - o.t, c: "#4b5563" }], maxO, fmt(o.n), `data-order="${esc(name)}"`)).join("");
+  const share = [...orders.entries()].filter(([, o]) => o.n >= 40).map(([name, o]) => [name, o, o.t / o.n]).sort((a, b) => b[2] - a[2]).slice(0, 10);
+  $("chart-share").innerHTML = share.map(([name, o, r]) => barRow(titleCase(name), [{ v: r, c: "#ef4444" }], 1, pct(o.t, o.n), `data-order="${esc(name)}"`)).join("");
+  document.querySelectorAll(".bar-row[data-order]").forEach(r => r.addEventListener("click", () => filterOrder(r.dataset.order)));
+}
+
+// ---------- Verbreitungsgebiete ----------
+function renderRanges() {
+  const withA = SP.filter(s => s.area > 0);
+  // Histogramm (log10 km2, Klassen von 0,5)
+  const nb = 17, bins = Array.from({ length: nb }, () => ({ t: 0, o: 0 }));
+  withA.forEach(s => { const b = Math.max(0, Math.min(nb - 1, Math.floor(Math.log10(s.area) * 2))); if (isThr(s)) bins[b].t++; else bins[b].o++; });
+  const W = 520, H = 250, m = { l: 36, r: 8, t: 10, b: 38 }, iw = W - m.l - m.r, ih = H - m.t - m.b, bw = iw / nb;
+  const maxB = Math.max(...bins.map(b => b.t + b.o));
+  const lbl = e => ["1", "10", "100", "1 Tsd.", "10 Tsd.", "100 Tsd.", "1 Mio.", "10 Mio.", "100 Mio."][e];
+  const bars = bins.map((b, i) => {
+    const x = m.l + i * bw, hO = ih * b.o / maxB, hT = ih * b.t / maxB, lo = Math.pow(10, i / 2), hi = Math.pow(10, (i + 1) / 2);
+    return `<g><title>${fmt(lo)}–${fmt(hi)} km²: ${fmt(b.o + b.t)} Arten, ${fmt(b.t)} bedroht</title><rect x="${x + 1}" y="${m.t + ih - hO - hT}" width="${bw - 2}" height="${hT}" fill="#ef4444"/><rect x="${x + 1}" y="${m.t + ih - hO}" width="${bw - 2}" height="${hO}" fill="#4b5563"/></g>`;
+  }).join("");
+  const ticks = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(e => `<text x="${m.l + e * 2 * bw}" y="${H - 20}" text-anchor="middle">${lbl(e)}</text>`).join("");
+  const yt = [0.5, 1].map(f => `<line x1="${m.l}" x2="${W - m.r}" y1="${m.t + ih * (1 - f)}" y2="${m.t + ih * (1 - f)}" stroke="#21262d"/><text x="${m.l - 4}" y="${m.t + ih * (1 - f) + 4}" text-anchor="end">${fmt(maxB * f)}</text>`).join("");
+  $("histChart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Histogramm der Verbreitungsgebietsgrößen">${yt}${bars}${ticks}<text x="${W / 2}" y="${H - 4}" text-anchor="middle">Gebietsgröße in km²</text></svg>`;
+  // Median je Status
+  const byS = {}; withA.forEach(s => (byS[s.status] = byS[s.status] || []).push(s.area));
+  const meds = ["CR", "EN", "VU", "NT", "LC", "DD"].filter(k => byS[k] && byS[k].length >= 3).map(k => [k, median(byS[k]), byS[k].length]);
+  $("medianChart").innerHTML = meds.map(([k, v, n]) => barRow(`${k} · ${STATUS[k][0]}`, [{ v: Math.log10(Math.max(1, v)), c: STATUS[k][1] }], 8, areaText(v))).join("")
+    + `<p class="sub" style="margin-top:10px">Bedrohte Arten haben typischerweise deutlich kleinere Gebiete als Arten ohne Gefährdung.</p>`;
+  // Listen
+  const sorted = [...withA].sort((a, b) => a.area - b.area);
+  $("smallList").innerHTML = sorted.slice(0, 8).map(s => speciesRow(s, areaText(s.area))).join("");
+  $("largeList").innerHTML = sorted.slice(-8).reverse().map(s => speciesRow(s, areaText(s.area))).join("");
+}
+
+// ---------- Familien ----------
+const famState = { key: "n", dir: -1, q: "", all: false };
+let FAMS = [];
+function buildFams() {
+  const m = new Map();
+  SP.forEach(s => { const f = m.get(s.family) || { family: s.family, order: s.order, n: 0, t: 0, a: [] }; f.n++; if (isThr(s)) f.t++; if (s.area > 0) f.a.push(s.area); m.set(s.family, f); });
+  FAMS = [...m.values()].map(f => ({ ...f, share: f.t / f.n, med: median(f.a) }));
+}
+function renderFams() {
+  const cols = [["family", "Familie"], ["order", "Ordnung"], ["n", "Arten", 1], ["t", "bedroht", 1], ["share", "Anteil bedroht", 1], ["med", "Median-Gebiet", 1]];
+  $("famHead").innerHTML = "<tr>" + cols.map(c => `<th data-k="${c[0]}" class="${c[2] ? "num" : ""}">${c[1]}${famState.key === c[0] ? (famState.dir > 0 ? " ▲" : " ▼") : ""}</th>`).join("") + "</tr>";
+  const q = famState.q.toLowerCase();
+  let rows = FAMS.filter(f => !q || f.family.toLowerCase().includes(q) || f.order.toLowerCase().includes(q));
+  rows.sort((a, b) => { const x = a[famState.key], y = b[famState.key]; return (typeof x === "string" ? x.localeCompare(y) : ((isNaN(x) ? -1 : x) - (isNaN(y) ? -1 : y))) * famState.dir; });
+  const shown = famState.all || q ? rows : rows.slice(0, 15);
+  $("famBody").innerHTML = shown.map(f => `<tr><td>${esc(titleCase(f.family))}</td><td>${esc(titleCase(f.order))}</td><td class="num">${fmt(f.n)}</td><td class="num">${fmt(f.t)}</td><td class="num">${pct(f.t, f.n)}</td><td class="num">${isNaN(f.med) ? "–" : areaText(f.med)}</td></tr>`).join("");
+  $("famMore").style.display = q ? "none" : "";
+  $("famMore").textContent = famState.all ? "Nur die ersten 15 zeigen" : `Alle ${FAMS.length} Familien anzeigen`;
+  $("famHead").querySelectorAll("th").forEach(th => th.addEventListener("click", () => {
+    const k = th.dataset.k; if (famState.key === k) famState.dir *= -1; else { famState.key = k; famState.dir = (k === "family" || k === "order") ? 1 : -1; }
+    renderFams();
+  }));
+}
+
+// ---------- Export ----------
+function exportCsv() {
+  const g = getGrid(), rows = ["lon_min,lat_min,lon_max,lat_max,arten,bedrohte_arten,anteil_bedroht_prozent,endemismus_index"];
+  for (let k = 0; k < g.all.length; k++) {
+    if (!g.all[k]) continue;
+    const i = k % g.W, j = Math.floor(k / g.W), x0 = -180 + i * g.cell, y0 = -90 + j * g.cell;
+    rows.push([x0, y0, x0 + g.cell, y0 + g.cell, g.all[k], g.thr[k], (100 * g.thr[k] / g.all[k]).toFixed(1), g.endem[k].toFixed(3)].join(","));
+  }
+  const blob = new Blob([rows.join("\n")], { type: "text/csv" }), a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `mammalatlas_raster_${S.order ? S.order.toLowerCase() + "_" : ""}${S.cell}grad.csv`; document.body.appendChild(a); a.click(); a.remove();
+  toast("CSV heruntergeladen");
+}
+
+// ---------- Steuerung ----------
+function refresh() {
+  $("busy").classList.add("on");
+  setTimeout(() => {
+    try {
+      const g = getGrid();
+      document.querySelectorAll("#modeSeg button").forEach(b => b.classList.toggle("active", b.dataset.mode === S.mode));
+      $("orderSel").value = S.order; $("cellSel").value = String(S.cell);
+      updateMap(g); renderTop(g); renderLatitude(g);
+      if (sel) openCell(sel.i, sel.j);
+      syncHash();
+    } finally { $("busy").classList.remove("on"); }
+  }, 30);
+}
+function setupControls() {
+  $("modeSeg").innerHTML = Object.entries(MODES).map(([k, m]) => `<button data-mode="${k}">${m.label}</button>`).join("");
+  $("modeSeg").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { S.mode = b.dataset.mode; refresh(); }));
+  const counts = {}; SP.forEach(s => counts[s.order] = (counts[s.order] || 0) + 1);
+  $("orderSel").innerHTML = `<option value="">Alle Ordnungen</option>` + Object.keys(counts).sort((a, b) => counts[b] - counts[a]).map(o => `<option value="${esc(o)}">${esc(titleCase(o))} (${counts[o]})</option>`).join("");
+  $("orderSel").addEventListener("change", e => { S.order = e.target.value; sel = null; refresh(); });
+  $("cellSel").addEventListener("change", e => { S.cell = Number(e.target.value); sel = null; refresh(); });
+  $("viewSeg").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { S.view = b.dataset.view; applyView(); syncHash(); }));
+  $("randomBtn").addEventListener("click", () => { const g = getGrid(), cs = topCells(g, 25); if (cs.length) { const c = cs[Math.floor(Math.random() * cs.length)]; gotoCell(c.i, c.j); } });
+  $("csvBtn").addEventListener("click", exportCsv);
+  $("shareBtn").addEventListener("click", () => { syncHash(); (navigator.clipboard ? navigator.clipboard.writeText(location.href) : Promise.reject()).then(() => toast("Link kopiert"), () => toast("Link steht in der Adresszeile")); });
+  $("famSearch").addEventListener("input", e => { famState.q = e.target.value; renderFams(); });
+  $("famMore").addEventListener("click", () => { famState.all = !famState.all; renderFams(); });
 }
 
 async function main() {
@@ -401,39 +793,15 @@ async function main() {
     status.innerHTML = 'Die Artendaten konnten nicht geladen werden.<br>Bitte über einen Webserver öffnen, z. B. <code>python3 -m http.server</code>.';
     return;
   }
-  renderCharts(sp);
-  $("content").hidden = false;
-  status.style.display = "none";
-
+  SP = sp;
+  readHash();
+  buildFams();
+  setupControls();
+  renderKpis(); renderStatusAndOrders(); renderRanges(); renderFams();
+  $("content").hidden = false; $("subnav").hidden = false; status.style.display = "none";
   const ok = await loadMapLibre();
-  if (!ok) { $("map").innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444">Konnte die Kartenbibliothek nicht laden.</div>'; return; }
-
-  const grids = {};
-  const compute = mode => grids[mode] || (grids[mode] = richnessGrid(sp, 2, mode === "thr" ? s => THREATENED.includes(s.status) : null));
-  const map = new maplibregl.Map({ container: "map", style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json", center: [15, 15], zoom: 1.4, minZoom: 0.8, maxZoom: 6 });
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-
-  const show = mode => {
-    const g = compute(mode), max = maxOf(g);
-    map.getSource("rich").setData(gridToGeoJSON(g));
-    map.setPaintProperty("rich-fill", "fill-color", colorExpr(max));
-    $("scale-max").textContent = fmt(max);
-    $("scale-label").textContent = mode === "thr" ? "bedrohte Arten je Zelle" : "Arten je Zelle";
-    document.querySelectorAll("#mode button").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
-  };
-
-  map.on("load", () => {
-    map.addSource("rich", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
-    map.addLayer({ id: "rich-fill", type: "fill", source: "rich", paint: { "fill-color": "#f0b429", "fill-opacity": 0.78 } });
-    show("all");
-    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
-    map.on("mousemove", "rich-fill", e => {
-      map.getCanvas().style.cursor = "pointer";
-      popup.setLngLat(e.lngLat).setHTML(`<div style="color:#0d1117;font-size:12px"><b>${fmt(e.features[0].properties.n)}</b> Arten in dieser Zelle</div>`).addTo(map);
-    });
-    map.on("mouseleave", "rich-fill", () => { map.getCanvas().style.cursor = ""; popup.remove(); });
-  });
-  document.querySelectorAll("#mode button").forEach(b => b.addEventListener("click", () => { if (map.getSource("rich")) show(b.dataset.mode); }));
+  if (!ok) { $("map").innerHTML = '<div style="padding:40px;text-align:center;color:#ef4444">Konnte die Kartenbibliothek nicht laden.</div>'; refresh(); return; }
+  setupMap();
 }
 main();
 </script>

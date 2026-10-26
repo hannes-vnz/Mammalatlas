@@ -1,5 +1,6 @@
 """Offline-Tests des Crawlers: Antworten der APIs werden durch Attrappen ersetzt."""
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -437,3 +438,68 @@ def test_threats_cli_schreibt_gesamtsumme(tmp_path):
     c.main(["threats", "--iucn", str(tmp_path / "iucn.json"), "--taxa", str(tmp_path / "taxa.json"), "--out", str(out)])
     d = json.loads(out.read_text())
     assert d["total"]["species"] == 1 and d["total"]["threats"]["5_1"] == 1 and d["regions"]["Indomalaya"]["species"] == 1
+
+
+# ------------------------------------------------------------------ IUCN-Verbreitungskarten
+def write_shapefile(base, records):
+    """Minimales Polygon-Shapefile (.shp/.dbf) fuer Tests: records = [(attrs, [ring, ...]), ...]."""
+    import struct
+    body = b""
+    for i, (_, rings) in enumerate(records, 1):
+        pts = [p for r in rings for p in r]
+        parts, k = [], 0
+        for r in rings:
+            parts.append(k); k += len(r)
+        content = struct.pack("<i4d2i", 5, 0, 0, 0, 0, len(rings), len(pts)) + struct.pack(f"<{len(parts)}i", *parts) \
+            + b"".join(struct.pack("<2d", *p) for p in pts)
+        body += struct.pack(">2i", i, len(content) // 2) + content
+    header = struct.pack(">7i", 9994, 0, 0, 0, 0, 0, (100 + len(body)) // 2) + struct.pack("<2i4d4d", 1000, 5, 0, 0, 0, 0, 0, 0, 0, 0)
+    (base.parent / (base.name + ".shp")).write_bytes(header + body)
+    fields = [("sci_name", 40), ("presence", 2), ("origin", 2)]
+    rlen = 1 + sum(n for _, n in fields)
+    dbf = struct.pack("<B3BIHH20x", 3, 26, 10, 26, len(records), 32 + 32 * len(fields) + 1, rlen)
+    for name, n in fields:
+        dbf += name.encode().ljust(11, b"\0") + b"C" + b"\0" * 4 + bytes([n, 0]) + b"\0" * 14
+    dbf += b"\r"
+    for attrs, _ in records:
+        dbf += b" " + b"".join(str(attrs[name]).encode().ljust(n) for name, n in fields)
+    (base.parent / (base.name + ".dbf")).write_bytes(dbf + b"\x1a")
+
+
+def square(x, y, s, clockwise=True):
+    r = [(x, y), (x, y + s), (x + s, y + s), (x + s, y), (x, y)]
+    return r if clockwise else r[::-1]
+
+
+def test_iucn_gebiete_alle_teilflaechen_ohne_eingeschleppte(tmp_path):
+    wavy = [(i / 10, 50 + 0.001 * (i % 2)) for i in range(0, 201)] + [(20, 40), (0, 40), (0, 50)]   # Linie mit Rauschen
+    boar = [square(-10, 35, 50), square(25, 37, 0.5), square(-5, 40, 2, clockwise=False), square(150, -30, 0.01)]
+    write_shapefile(tmp_path / "MAMMALS", [
+        ({"sci_name": "Sus scrofa", "presence": 1, "origin": 1}, boar),
+        ({"sci_name": "Sus scrofa", "presence": 1, "origin": 3}, [square(-100, 30, 20)]),     # eingeschleppt: nicht
+        ({"sci_name": "Vulpes vulpes", "presence": 1, "origin": 1}, [list(reversed(wavy))[::-1]])])
+    r = c.iucn_ranges([tmp_path / "MAMMALS.shp"], log=lambda *a: None)
+    parts = r["Sus scrofa"].split("*")
+    assert len(parts) == 2                                       # Festland + Samos; Loch und Winzling (0,0001 Grad^2) weg
+    xs = [float(p.split("|")[0]) for part in parts for p in part.split(";")]
+    assert min(xs) == -10 and max(xs) == 40 and -100 not in xs
+    fox = r["Vulpes vulpes"].split(";")
+    assert len(fox) < 20                                         # Rauschen vereinfacht
+    assert len(c.build_range([wavy[::-1]], tol=0.0001, max_points=30).split(";")) <= 30
+
+
+def test_gebiete_ersetzen_auch_ueber_synonym():
+    rows = [["Boar", "Sus_scrofa", "", "", "LC", "", "? kg", "? J.", "26.9|37.7;27|37.8;26.9|37.7"],
+            ["Armadillo", "Chaetophractus_vellerosus", "", "", "LC", "", "? kg", "? J.", "1|1;2|1;2|2"],
+            ["Fox", "Vulpes_vulpes", "", "", "LC", "", "? kg", "? J.", "5|5;6|5;6|6"]]
+    taxa = [{"sciName": "Dasyphractus vellerosus", "synonyms": ["Chaetophractus vellerosus"]}]
+    new, n, prov = c.replace_ranges(rows, {"Sus scrofa": "0|0;0|9;9|9;0|0", "Dasyphractus vellerosus": "1|1;3|1;3|3;1|1"}, taxa)
+    assert n == 2 and new[0][8] == "0|0;0|9;9|9;0|0" and new[1][8] == "1|1;3|1;3|3;1|1" and new[2][8] == "5|5;6|5;6|6"
+    assert prov == {"Sus_scrofa": {"range": "iucn-polygons"}, "Chaetophractus_vellerosus": {"range": "iucn-polygons"}}
+
+
+def test_kleine_insel_bleibt_und_unterart_zaehlt_zur_art(tmp_path):
+    island = [(10 + 0.1 * math.cos(-2 * math.pi * i / 30), 5 + 0.1 * math.sin(-2 * math.pi * i / 30)) for i in range(31)]
+    write_shapefile(tmp_path / "S", [({"sci_name": "Sminthopsis aitkeni ssp. x", "presence": 1, "origin": 1}, [island])])
+    r = c.iucn_ranges([tmp_path / "S.shp"], log=lambda *a: None)
+    assert list(r) == ["Sminthopsis aitkeni"] and len(r["Sminthopsis aitkeni"].split(";")) >= 4

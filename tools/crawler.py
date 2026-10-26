@@ -688,6 +688,189 @@ def crawl_gbif(http, names, max_species=200, max_records=300, log=print, keys=No
     return out
 
 
+# --------------------------------------------------------------------------- IUCN: Verbreitungskarten (Shapefile)
+# Die alten Atlasgebiete enthalten bei vielen Arten nur eine Teilflaeche (z. B. Wildschwein: Samos). Dieser Schritt
+# liest die IUCN-Karten (Download ueber das IUCN-Konto, Datei MAMMALS*.shp) und behaelt alle Teilflaechen, vereinfacht.
+
+def read_dbf(path):
+    """Liest eine dBASE-Tabelle (Attribute eines Shapefiles) zeilenweise als dict."""
+    import struct
+    cpg = Path(str(path)[:-4] + ".cpg")
+    enc = "utf-8" if not cpg.exists() or "utf" in cpg.read_text().lower() else "latin-1"
+    with open(path, "rb") as f:
+        n, hlen, rlen = struct.unpack("<xxxxIHH20x", f.read(32))
+        fields = []
+        while True:
+            d = f.read(32)
+            if d[:1] == b"\r":
+                break
+            fields.append((d[:11].split(b"\0")[0].decode("ascii").lower(), d[16]))
+        f.seek(hlen)
+        for _ in range(n):
+            rec = f.read(rlen)
+            pos, row = 1, {}
+            for name, length in fields:
+                row[name] = rec[pos:pos + length].decode(enc, errors="replace").strip()
+                pos += length
+            yield row
+
+
+def read_shp_records(path):
+    """Rohe Datensaetze eines Shapefiles (Bytes); erst parse_polygon wandelt sie um, das spart Zeit beim Ueberspringen."""
+    import struct
+    with open(path, "rb") as f:
+        f.seek(100)
+        while True:
+            head = f.read(8)
+            if len(head) < 8:
+                return
+            yield f.read(struct.unpack(">ii", head)[1] * 2)
+
+
+def parse_polygon(content):
+    """Polygon-Shape (Typ 5, 15, 25) -> Liste von Ringen [(x, y), ...]; andere Typen -> []."""
+    import struct
+    if struct.unpack("<i", content[:4])[0] not in (5, 15, 25):
+        return []
+    nparts, npoints = struct.unpack("<ii", content[36:44])
+    parts = list(struct.unpack(f"<{nparts}i", content[44:44 + 4 * nparts])) + [npoints]
+    coords = struct.unpack(f"<{2 * npoints}d", content[44 + 4 * nparts:44 + 4 * nparts + 16 * npoints])
+    return [[(coords[2 * i], coords[2 * i + 1]) for i in range(parts[k], parts[k + 1])] for k in range(nparts)]
+
+
+def read_shp_polygons(path):
+    for content in read_shp_records(path):
+        yield parse_polygon(content)
+
+
+def ring_area(ring):
+    """Vorzeichenbehaftete Flaeche (Grad^2); im Shapefile sind Aussenringe im Uhrzeigersinn, also negativ."""
+    return sum(ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1] for i in range(len(ring) - 1)) / 2
+
+
+def simplify(ring, tol):
+    """Douglas-Peucker ohne Rekursion; erster und letzter Punkt bleiben."""
+    if len(ring) < 4:
+        return ring
+    keep = [False] * len(ring)
+    keep[0] = keep[-1] = True
+    stack = [(0, len(ring) - 1)]
+    while stack:
+        a, b = stack.pop()
+        (x1, y1), (x2, y2) = ring[a], ring[b]
+        dx, dy = x2 - x1, y2 - y1
+        norm = math.hypot(dx, dy)
+        best, idx = 0.0, None
+        for i in range(a + 1, b):
+            x, y = ring[i]
+            d = abs(dy * x - dx * y + x2 * y1 - y2 * x1) / norm if norm else math.hypot(x - x1, y - y1)
+            if d > best:
+                best, idx = d, i
+        if idx is not None and best > tol:
+            keep[idx] = True
+            stack += [(a, idx), (idx, b)]
+    return [p for p, k in zip(ring, keep) if k]
+
+
+def build_range(rings, tol=0.05, max_points=1200, min_area=0.002, digits=2):
+    """Aussenringe -> Atlasformat 'x|y;...*x|y;...'. Kleine Inseln fallen weg (die groesste bleibt immer),
+    die Toleranz steigt, bis hoechstens max_points Punkte uebrig sind."""
+    outer = [r for r in rings if len(r) >= 4 and ring_area(r) < 0] or [r for r in rings if len(r) >= 4]
+    if not outer:
+        return ""
+    outer.sort(key=lambda r: -abs(ring_area(r)))
+    outer = outer[:1] + [r for r in outer[1:] if abs(ring_area(r)) >= min_area]
+    while True:
+        parts = []
+        for r in outer:
+            for t, dg in ((tol, digits), (tol / 10, digits + 1)):   # kleine Inseln nicht wegvereinfachen
+                pts = []
+                for x, y in simplify(r, t):
+                    p = (round(x, dg), round(y, dg))
+                    if not pts or p != pts[-1]:
+                        pts.append(p)
+                if len(pts) >= 4:
+                    parts.append(pts)
+                    break
+        if sum(len(p) for p in parts) <= max_points or tol > 2:
+            break
+        tol *= 1.6
+    return "*".join(";".join(f"{x:g}|{y:g}" for x, y in p) for p in parts)
+
+
+def _prep_ring(ring, tol, digits):
+    """Erst auf das Ausgaberaster runden und Doppelte entfernen (schnell), dann Douglas-Peucker."""
+    pts = []
+    for x, y in ring:
+        p = (round(x, digits), round(y, digits))
+        if not pts or p != pts[-1]:
+            pts.append(p)
+    return simplify(pts, tol) if len(pts) >= 4 else pts
+
+
+def iucn_ranges(shps, presence=(1, 2), origin=(1, 2, 6), log=print, tol=0.08, max_points=900, min_area=0.002, digits=2, only=None):
+    """{wissenschaftlicher Name: Gebiet} aus IUCN-Shapefiles. Standard: vorkommend/wahrscheinlich vorkommend,
+    heimisch/wiederangesiedelt/gezielt angesiedelt (eingeschleppte Vorkommen wie Wildschwein in Amerika nicht).
+    Jede Flaeche wird schon beim Lesen vereinfacht, damit auch Gigabyte-Dateien in den Speicher passen."""
+    rings_by, small, n = {}, {}, 0
+    pairs = ((a, s) for shp in shps for a, s in zip(read_dbf(str(shp)[:-4] + ".dbf"), read_shp_records(shp)))
+    for attrs, raw in pairs:
+        n += 1
+        if n % 2000 == 0:
+            log(f"  Shapefile: {n} Polygone gelesen, {len(rings_by)} Arten")
+        name = " ".join((attrs.get("sci_name") or attrs.get("binomial") or "").split()[:2])   # Unterart -> Art
+        try:
+            pres, orig = int(float(attrs.get("presence") or 1)), int(float(attrs.get("origin") or 1))
+        except ValueError:
+            continue
+        if not name or pres not in presence or orig not in origin or (only is not None and name not in only):
+            continue
+        for ring in parse_polygon(raw):
+            a = ring_area(ring)
+            if a >= 0:                                   # Loch (gegen den Uhrzeigersinn)
+                continue
+            if -a < min_area:                            # winzige Insel: nur als Rueckfall merken
+                if -a > small.get(name, (0, None))[0]:
+                    small[name] = (-a, ring)
+                continue
+            r = _prep_ring(ring, tol, digits)
+            if len(r) < 4:
+                r = _prep_ring(ring, tol / 10, digits + 1)
+            if len(r) >= 4:
+                rings_by.setdefault(name, []).append(r)
+    for name, (_, ring) in small.items():                # Arten, die nur aus kleinen Inseln bestehen
+        if name not in rings_by:
+            r = _prep_ring(ring, tol / 10, digits + 1)
+            if len(r) >= 4:
+                rings_by[name] = [r]
+    log(f"  {n} Polygone, {len(rings_by)} Arten mit Gebiet; begrenze Punktzahl ...")
+    out = {}
+    for name, rings in rings_by.items():
+        r = build_range(rings, tol=tol, max_points=max_points, min_area=0, digits=digits + (1 if name in small and len(rings) == 1 else 0))
+        if r:
+            out[name] = r
+    return out
+
+
+def replace_ranges(rows, ranges, taxa=()):
+    """Ersetzt Gebiete der Atlaszeilen durch neue (Name oder MDD-Synonym). Rueckgabe: (Zeilen, Anzahl, Herkunft)."""
+    rows = [list(r) for r in rows]
+    alias = {}
+    for s in taxa:
+        for n in [s["sciName"]] + list(s.get("synonyms") or []):
+            alias.setdefault(name_key(n), []).append(name_key(s["sciName"]))
+    by = {name_key(k): v for k, v in ranges.items()}
+    done, prov = 0, {}
+    for r in rows:
+        k = name_key(r[1])
+        new = by.get(k) or next((by[a] for a in alias.get(k, []) if a in by), None)
+        if new and new != r[8]:
+            r[8] = new
+            done += 1
+            prov[r[1]] = {"range": "iucn-polygons"}
+    return rows, done, prov
+
+
 # --------------------------------------------------------------------------- IUCN: Gefaehrdungsursachen
 # Die IUCN-Daten selbst werden nicht veroeffentlicht (Nutzungsbedingungen), nur Zaehlungen je Region (Schritt 'threats').
 THREAT_LABELS = {  # IUCN Threats Classification Scheme 3.3, oberste Ebene, plus wichtige Unterklassen
@@ -1216,6 +1399,14 @@ def build_parser():
     iu.add_argument("--limit", type=int, default=None, help="zum Testen: hoechstens N Bewertungen")
     iu.add_argument("--out", default="crawl/iucn.json", help="Rohdaten, nicht veroeffentlichen")
 
+    rg = sub.add_parser("ranges", help="Verbreitungsgebiete aus IUCN-Shapefiles (alle Teilflaechen, vereinfacht)")
+    rg.add_argument("--shp", default="sources/iucn", help="Shapefile oder Ordner mit *.shp (IUCN-Download 'MAMMALS')")
+    rg.add_argument("--tolerance", type=float, default=0.08, help="Vereinfachung in Grad (Start, 0,08 = ca. 8 km)")
+    rg.add_argument("--max-points", type=int, default=900, help="hoechstens so viele Punkte je Art")
+    rg.add_argument("--min-area", type=float, default=0.002, help="kleinere Teilflaechen (Grad^2) weglassen, die groesste bleibt")
+    rg.add_argument("--only-missing", default="", help="nur Arten, die in dieser ranges.json noch fehlen (ergaenzt sie)")
+    rg.add_argument("--out", default="crawl/ranges.json")
+
     th = sub.add_parser("threats", help="Ursachen je Region zaehlen -> data/threats_by_region.json (ohne Netz)")
     th.add_argument("--iucn", default="crawl/iucn.json"); th.add_argument("--taxa", default="crawl/taxa.json")
     th.add_argument("--out", default="data/threats_by_region.json")
@@ -1223,6 +1414,7 @@ def build_parser():
     m = sub.add_parser("merge", help="in species_part_*.txt zusammenfuehren (ohne --apply nur Vorschau)")
     m.add_argument("--data", default="data"); m.add_argument("--taxa", default="crawl/taxa.json")
     m.add_argument("--gbif", default="crawl/gbif.json")
+    m.add_argument("--ranges", default="", help="crawl/ranges.json: vorhandene Gebiete durch IUCN-Gebiete ersetzen")
     m.add_argument("--update-status", action="store_true", help="IUCN-Status aus Wikidata uebernehmen")
     m.add_argument("--no-new", action="store_true", help="keine neuen Arten anlegen")
     m.add_argument("--apply", action="store_true", help="Dateien wirklich schreiben (Sicherung in data/.backup)")
@@ -1232,7 +1424,7 @@ def build_parser():
 def main(argv=None, http=None):
     a = build_parser().parse_args(argv)
     http = http or Http(a.cache, a.contact, a.delay)
-    if not a.contact and a.cmd not in ("merge", "traits", "threats"):
+    if not a.contact and a.cmd not in ("merge", "traits", "threats", "ranges"):
         print("Hinweis: Bitte --contact angeben (Wikimedia/GBIF erwarten einen erreichbaren Kontakt im User-Agent).", file=sys.stderr)
 
     if a.cmd == "taxa":
@@ -1295,6 +1487,21 @@ def main(argv=None, http=None):
         except CrawlError as e:
             raise SystemExit(f"IUCN-Abfrage fehlgeschlagen: {e}\nBei HTTP 401: Schluessel pruefen bzw. im IUCN-Konto freischalten.")
         _save(a.out, data)
+    elif a.cmd == "ranges":
+        src = Path(a.shp)
+        shps = sorted(src.glob("**/*.shp")) if src.is_dir() else [src]
+        if not shps:
+            raise SystemExit(f"Kein Shapefile unter {src}. IUCN-Download 'Mammals' entpacken, z. B. nach sources/iucn/.")
+        print("Lese " + ", ".join(p.name for p in shps))
+        have = _load(a.only_missing) if a.only_missing else {}
+        only = None
+        if a.only_missing:
+            only = {" ".join((r.get("sci_name") or r.get("binomial") or "").split()[:2])
+                    for shp in shps for r in read_dbf(str(shp)[:-4] + ".dbf")} - set(have)
+            print(f"{len(only)} Arten ohne Gebiet in {a.only_missing}")
+        data = {**have, **iucn_ranges(shps, tol=a.tolerance, max_points=a.max_points, min_area=a.min_area, only=only)}
+        print(f"{len(data)} Gebiete, zusammen {sum(len(v) for v in data.values()) / 1e6:.1f} MB")
+        _save(a.out, data)
     elif a.cmd == "threats":
         regions, total, unmatched = threat_summary(_load(a.iucn), _load(a.taxa))
         print(f"{total['species']} gefaehrdete Arten (VU/EN/CR), {unmatched} ohne Zuordnung zu MDD")
@@ -1307,7 +1514,13 @@ def main(argv=None, http=None):
     elif a.cmd == "merge":
         rows = read_species(a.data)
         gb = _load(a.gbif) if Path(a.gbif).exists() else {}
-        new_rows, rep, prov = merge_species(rows, _load(a.taxa), gb, a.update_status, not a.no_new)
+        taxa = _load(a.taxa)
+        new_rows, rep, prov = merge_species(rows, taxa, gb, a.update_status, not a.no_new)
+        if a.ranges:
+            new_rows, n_rng, prov_rng = replace_ranges(new_rows, _load(a.ranges), taxa)
+            for k, v in prov_rng.items():
+                prov.setdefault(k, {}).update(v)
+            print(f"\nGebiete aus IUCN-Karten ersetzt: {n_rng}")
         print_report(rep)
         if a.apply:
             stamp = date.today().isoformat()

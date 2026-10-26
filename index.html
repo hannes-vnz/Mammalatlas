@@ -106,6 +106,22 @@
   #loader.error .spinner { display: none; }
   #loader.error .msg { color: #ef4444; max-width: 440px; text-align: center; padding: 0 20px; line-height: 1.6; font-size: 13px; }
   #loader.error code { background: var(--panel-2); padding: 2px 6px; border-radius: 4px; color: var(--text); }
+  .mode-switch { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 0 0 22px; }
+  .mode-switch button { flex: 1; background: transparent; border: none; color: var(--text-dim); padding: 9px 8px; font-size: 12px; cursor: pointer; }
+  .mode-switch button.active { background: var(--accent); color: #1a1207; font-weight: 600; }
+  #filters:not(.mode-extinct) #extinct-controls { display: none; }
+  #filters.mode-extinct .living-only { display: none; }
+  .photo-marker.extinct .marker-inner { border-color: #9ca3af; }
+  .photo-marker.extinct .marker-inner img { filter: grayscale(1) contrast(1.05); }
+  .photo-marker.extinct .placeholder { color: #9ca3af; }
+  .year-badge { position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%); background: var(--bg); border: 1px solid #4b5563; color: #d1d5db; font-size: 9px; padding: 0 5px; border-radius: 8px; pointer-events: none; white-space: nowrap; }
+  input[type=range].timeline { width: 100%; accent-color: var(--accent); }
+  .year-readout { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-top: 6px; color: var(--text-dim); }
+  .year-readout b { color: var(--text); font-size: 16px; }
+  .small-btn { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; }
+  .small-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ext-note, .range-note { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+  .summary { font-size: 13px; line-height: 1.6; margin: 0 0 14px; }
   .nav-link { display: block; text-align: center; margin-top: 10px; padding: 9px; border: 1px solid var(--border); border-radius: 6px; color: var(--accent); font-size: 12px; text-decoration: none; }
   .nav-link:hover { border-color: var(--accent); }
   .credits { font-size: 10px; line-height: 1.6; color: var(--text-dim); margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border-soft); }
@@ -168,28 +184,47 @@
     </div>
     <p class="subtitle" id="species-count-label">LADE DATEN...</p>
 
-    <div class="filter-group">
+    <div class="mode-switch" id="mode-switch">
+      <button data-mode="living" class="active">Heute lebend</button>
+      <button data-mode="extinct">† Ausgestorben</button>
+    </div>
+
+    <div class="filter-group living-only">
       <h3>Suche</h3>
       <input type="text" class="search-box" id="search" placeholder="Name, Familie, Ordnung…" />
     </div>
     
-    <div class="filter-group">
+    <div class="filter-group living-only">
       <h3>Schutzstatus</h3>
       <div class="chip-row" id="status-chips"></div>
     </div>
     
-    <div class="filter-group">
+    <div class="filter-group living-only">
       <h3>Ordnung</h3>
       <div class="chip-row scrollable" id="order-chips"></div>
     </div>
     
-    <div class="filter-group">
+    <div class="filter-group living-only">
       <h3>Familie</h3>
       <div class="chip-row scrollable" id="family-chips"></div>
     </div>
 
-    <div class="stats"><strong id="visible-count">0</strong>Arten sichtbar</div>
-    <button id="reset-btn">Filter zurücksetzen</button>
+    <div id="extinct-controls">
+      <div class="filter-group">
+        <h3>Ausgestorben bis</h3>
+        <input type="range" class="timeline" id="ext-year" min="1500" max="2025" step="1" value="2025" />
+        <div class="year-readout"><b id="ext-year-label">2025</b><button class="small-btn" id="ext-play">▶ Zeitraffer</button></div>
+      </div>
+      <div class="filter-group">
+        <h3>Ursache</h3>
+        <div class="chip-row" id="ext-cause-chips"></div>
+      </div>
+      <div class="stats"><strong id="ext-visible">0</strong><span id="ext-visible-text">Arten sichtbar</span></div>
+      <p class="ext-note" id="ext-note"></p>
+    </div>
+
+    <div class="stats living-only"><strong id="visible-count">0</strong>Arten sichtbar</div>
+    <button id="reset-btn" class="living-only">Filter zurücksetzen</button>
 
     <a class="nav-link" href="insights.html">📊 Insights &amp; Hotspots →</a>
 
@@ -616,6 +651,8 @@ async function init() {
     loader.style.opacity = "0";
     setTimeout(() => { loader.style.display = "none"; }, 500);
 
+    fetch("./data/provenance.json").then(r => r.ok ? r.json() : {}).then(j => Object.assign(PROV, j)).catch(() => {});
+    if (hashParams.mode === "extinct") setMode("extinct");
     if (hashParams.art) {
       const wanted = hashParams.art.toLowerCase();
       const hit = state.species.find(sp => sp.sciName.toLowerCase() === wanted);
@@ -641,6 +678,7 @@ const MAX_MARKERS_ON_SCREEN = 300;
 
 function renderMarkers() {
   if (!window._map) return;
+  if (ext.active) { renderExtinct(); return; }
   const map = window._map, bnd = map.getBounds();
   const view = [Math.max(-180, bnd.getWest()), Math.max(-85, bnd.getSouth()), Math.min(180, bnd.getEast()), Math.min(85, bnd.getNorth())];
 
@@ -743,6 +781,8 @@ function deselectSpecies() {
   state.selectedId = null;
   activeMarkers.forEach(m => m.el.classList.remove("selected"));
   window._map.getSource("selected-range").setData({ type:"FeatureCollection", features:[] });
+  ext.selectedId = null;
+  ext.markers.forEach(m => m.el.classList.remove("selected"));
   appContainer.classList.remove("sidebar-open");
   backdrop.classList.remove('visible');
 }
@@ -805,6 +845,13 @@ function applyFilters() {
   }
 }
 
+const PROV = {};
+function rangeNote(sp) {
+  const p = PROV[sp.sciName.replace(/ /g, "_")] || {};
+  return p.range && String(p.range).startsWith("gbif")
+    ? '<p class="range-note">Verbreitungsgebiet: grobe Näherung aus GBIF-Fundpunkten, nicht aus Expertenkarten.</p>' : "";
+}
+
 function showSpeciesDetail(sp) {
   const el = document.getElementById("species-detail");
   const known = v => v && !String(v).trim().startsWith("?");
@@ -829,11 +876,195 @@ function showSpeciesDetail(sp) {
         <span class="badge taxonomy clickable" data-term="${esc(sp.family)}">${esc(sp.family || "Familie Unbekannt")}</span>
       </div>
       ${cells.length ? `<div class="info-grid">${cells.join("")}</div>` : ""}
+      ${rangeNote(sp)}
     </div>`;
 
   if (photo) document.getElementById("hero-image").style.backgroundImage = `url("${sp.image_url.replace(/"/g, "%22")}")`;
   el.querySelectorAll(".badge.clickable").forEach(b => b.addEventListener("click", () => triggerSearch(b.dataset.term)));
 }
+
+// ---------- Ausgestorbenen-Atlas ----------
+// Daten: data/extinct_species.json (Beispieldaten oder Ausgabe von tools/crawler.py extinct)
+const ext = { active: false, loaded: false, list: [], year: 2025, minYear: 1500, maxYear: 2025, causes: new Set(),
+              markers: new Map(), selectedId: null, timer: null };
+
+async function loadExtinct() {
+  if (ext.loaded) return ext.list.length > 0;
+  ext.loaded = true;
+  try {
+    const r = await fetch("./data/extinct_species.json");
+    if (!r.ok) throw new Error("fehlt");
+    const j = await r.json();
+    const arr = Array.isArray(j) ? j : (j.species || []);
+    ext.meta = Array.isArray(j) ? {} : (j.meta || {});
+    ext.list = arr.filter(s => isFinite(s.lat) && isFinite(s.lng) && s.lat !== null && s.lng !== null).map(s => {
+      const lng = Number(s.lng), lat = Number(s.lat);
+      return Object.assign({}, s, {
+        id: String(s.id || s.sciName), lng, lat, anchor: [lng, lat],
+        range: { bbox: [lng, lat, lng, lat], rings: [], boxes: [] },     // Punkt: reicht fuer die Marker-Auswahl
+        poly: s.range ? parseRange(s.range) : null,
+        photo: !!s.img && String(s.img).startsWith("https://")
+      });
+    });
+    const years = ext.list.map(s => s.year).filter(y => y != null);
+    if (years.length) ext.minYear = Math.floor(Math.min(...years) / 10) * 10;
+    ext.maxYear = new Date().getFullYear();
+    ext.year = ext.maxYear;
+    ext.list.sort((a, b) => (b.photo - a.photo) || ((a.year ?? 9999) - (b.year ?? 9999)));
+  } catch (e) { console.warn("Ausgestorbene Arten nicht geladen:", e); ext.list = []; }
+  return ext.list.length > 0;
+}
+
+function extinctVisible() {
+  return ext.list.filter(s => (s.year == null || s.year <= ext.year) &&
+    (!ext.causes.size || (s.causes || []).some(c => ext.causes.has(c))));
+}
+
+function updateExtinctReadout(n) {
+  document.getElementById("ext-year-label").textContent = ext.year;
+  document.getElementById("ext-visible").textContent = n;
+  document.getElementById("ext-visible-text").textContent = ` von ${ext.list.length} Arten bis ${ext.year}`;
+}
+
+function renderExtinct() {
+  const map = window._map, bnd = map.getBounds();
+  const view = [Math.max(-180, bnd.getWest()), Math.max(-85, bnd.getSouth()), Math.min(180, bnd.getEast()), Math.min(85, bnd.getNorth())];
+  const vis = extinctVisible();
+  updateExtinctReadout(vis.length);
+  const picked = pickMarkers(vis, view, (lng, lat) => { const p = map.project([lng, lat]); return [p.x, p.y]; },
+    { cap: 400, minDist: window.innerWidth <= 900 ? 46 : 52, forceId: ext.selectedId });
+  const keep = new Set(picked.map(m => m.sp.id));
+  for (const [id, m] of ext.markers) if (!keep.has(id)) { m.marker.remove(); ext.markers.delete(id); }
+  picked.forEach(({ sp, lng, lat }) => {
+    if (ext.markers.has(sp.id)) return;
+    const el = document.createElement("div");
+    el.className = "photo-marker extinct" + (ext.selectedId === sp.id ? " selected" : "");
+    const inner = document.createElement("div");
+    inner.className = "marker-inner";
+    if (sp.photo) {
+      const img = document.createElement("img");
+      img.src = sp.img; img.alt = sp.common || sp.sciName; img.loading = "lazy";
+      img.onerror = () => { inner.innerHTML = '<div class="placeholder">†</div>'; };
+      inner.appendChild(img);
+    } else inner.innerHTML = '<div class="placeholder">†</div>';
+    const badge = document.createElement("div");
+    badge.className = "year-badge";
+    badge.textContent = sp.year != null ? (sp.yearApprox ? "ca. " : "") + sp.year : "?";
+    el.appendChild(inner); el.appendChild(badge);
+    el.addEventListener("click", e => { e.stopPropagation(); selectExtinct(sp.id); });
+    ext.markers.set(sp.id, { marker: new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map), el });
+  });
+}
+
+function selectExtinct(id) {
+  const sp = ext.list.find(s => s.id === id);
+  if (!sp) return;
+  ext.selectedId = id;
+  ext.markers.forEach((m, mid) => m.el.classList.toggle("selected", mid === id));
+  const map = window._map;
+  map.getSource("selected-range").setData({ type: "FeatureCollection",
+    features: sp.poly ? [{ type: "Feature", properties: { color: "#9ca3af" }, geometry: rangeGeometry(sp.poly ? { range: sp.poly } : sp) }] : [] });
+  appContainer.classList.add("sidebar-open");
+  if (window.innerWidth <= 900) { filtersPanel.classList.remove("open"); backdrop.classList.remove("visible"); }
+  document.getElementById("hint").classList.add("hidden");
+  showExtinctDetail(sp);
+  const padding = window.innerWidth <= 900
+    ? { top: 70, bottom: Math.round(window.innerHeight * 0.45) + 20, left: 30, right: 30 }
+    : { top: 70, bottom: 70, left: 50, right: 450 };
+  if (sp.poly && sp.poly.bbox[2] - sp.poly.bbox[0] < 300) {
+    const bb = sp.poly.bbox;
+    map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding, maxZoom: 6, duration: 800 });
+  } else map.flyTo({ center: sp.anchor, zoom: Math.max(map.getZoom(), 4), padding, duration: 800 });
+}
+
+function showExtinctDetail(sp) {
+  const el = document.getElementById("species-detail");
+  const yearText = sp.year != null ? (sp.yearApprox ? "ca. " : "") + sp.year : "Jahr unbekannt";
+  const auto = sp.yearSource && !["seed", "override"].includes(sp.yearSource);
+  const credit = sp.img && sp.imgPage ? `<div class="img-credit"><a href="${esc(sp.imgPage)}" target="_blank" rel="noopener">Bild: Wikimedia Commons${sp.imgLicense ? " · " + esc(sp.imgLicense) : ""}</a></div>` : "";
+  el.innerHTML = `
+    ${sp.photo ? '<div class="hero-image" id="hero-image"></div>' : ""}
+    ${credit}
+    <div class="detail-content">
+      <div class="common">${esc(sp.common || sp.sciName)}</div>
+      <div class="scientific">${esc(sp.sciName)}${sp.rank === "subspecies" ? " (Unterart)" : ""}</div>
+      <div class="badge-row">
+        <span class="badge status-badge" style="background:#f5f5f5;color:#111">† ${esc(yearText)}</span>
+        ${sp.order ? `<span class="badge taxonomy">${esc(sp.order)}</span>` : ""}
+        ${sp.family ? `<span class="badge taxonomy">${esc(sp.family)}</span>` : ""}
+        ${(sp.causes || []).map(c => `<span class="badge">${esc(c)}</span>`).join("")}
+      </div>
+      ${sp.region ? `<div class="info-grid"><div class="info-cell"><div class="label">Verbreitung</div><div class="value">${esc(sp.region)}</div></div></div>` : ""}
+      ${sp.summary ? `<p class="summary">${esc(sp.summary)}</p>` : ""}
+      ${sp.wikipedia ? `<p><a href="${esc(sp.wikipedia)}" target="_blank" rel="noopener">Mehr bei Wikipedia →</a></p>` : ""}
+      <p class="range-note">${auto ? "Jahr und Ursachen wurden automatisch aus Wikipedia/GBIF abgeleitet und sollten geprüft werden. " : ""}${String(sp.source || "").startsWith("seed") ? "Beispieldaten, handkuratiert und nicht verifiziert. " : ""}${sp.poly ? "Gebiet: grobe Näherung aus GBIF-Fundpunkten." : "Der Marker zeigt eine ungefähre Lage."}</p>
+    </div>`;
+  if (sp.photo) document.getElementById("hero-image").style.backgroundImage = `url("${String(sp.img).replace(/"/g, "%22")}")`;
+}
+
+function buildExtinctControls() {
+  const slider = document.getElementById("ext-year");
+  slider.min = ext.minYear; slider.max = ext.maxYear; slider.value = ext.year;
+  slider.oninput = () => { ext.year = Number(slider.value); renderExtinct(); };
+  document.getElementById("ext-play").onclick = togglePlay;
+  const causes = Array.from(new Set(ext.list.flatMap(s => s.causes || []))).sort();
+  const box = document.getElementById("ext-cause-chips");
+  box.innerHTML = "";
+  causes.forEach(c => {
+    const chip = document.createElement("div"); chip.className = "chip"; chip.textContent = c;
+    chip.onclick = () => { ext.causes.has(c) ? ext.causes.delete(c) : ext.causes.add(c); chip.classList.toggle("active"); renderExtinct(); };
+    box.appendChild(chip);
+  });
+  document.getElementById("ext-note").textContent = String((ext.meta && ext.meta.note) || "");
+}
+
+function stopPlay() {
+  if (ext.timer) { clearInterval(ext.timer); ext.timer = null; }
+  const b = document.getElementById("ext-play"); if (b) b.textContent = "▶ Zeitraffer";
+}
+function togglePlay() {
+  if (ext.timer) { stopPlay(); return; }
+  if (ext.year >= ext.maxYear) ext.year = ext.minYear;
+  document.getElementById("ext-play").textContent = "❚❚ Stopp";
+  ext.timer = setInterval(() => {
+    ext.year = Math.min(ext.maxYear, ext.year + Math.max(1, Math.round((ext.maxYear - ext.minYear) / 120)));
+    document.getElementById("ext-year").value = ext.year;
+    renderExtinct();
+    if (ext.year >= ext.maxYear) stopPlay();
+  }, 90);
+}
+
+async function setMode(mode) {
+  const wantExt = mode === "extinct";
+  if (wantExt === ext.active) return;
+  const label = document.getElementById("species-count-label");
+  if (wantExt) {
+    if (!(await loadExtinct())) {
+      label.textContent = "KEINE DATEN FÜR AUSGESTORBENE ARTEN (data/extinct_species.json)";
+      return;
+    }
+    deselectSpecies();
+    activeMarkers.forEach(m => m.marker.remove()); activeMarkers.clear();
+    ext.active = true;
+    filtersPanel.classList.add("mode-extinct");
+    document.getElementById("legend").style.display = "none";
+    buildExtinctControls();
+    label.textContent = `† AUSGESTORBENE ARTEN · ${ext.list.length}`;
+    renderExtinct();
+  } else {
+    stopPlay();
+    deselectSpecies();
+    ext.active = false;
+    ext.markers.forEach(m => m.marker.remove()); ext.markers.clear();
+    filtersPanel.classList.remove("mode-extinct");
+    document.getElementById("legend").style.display = "";
+    label.textContent = `PHOTO EDITION · ${state.species.length} ARTEN`;
+    renderMarkers();
+  }
+  document.querySelectorAll("#mode-switch button").forEach(b => b.classList.toggle("active", (b.dataset.mode === "extinct") === ext.active));
+}
+document.querySelectorAll("#mode-switch button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+
 
 init();
 </script>

@@ -2,7 +2,7 @@
 
 Interactive world atlas of mammals: distribution ranges as map layers, filterable by order and IUCN status, with species photos from Wikimedia Commons. Runs entirely in the browser.
 
-**[Live demo](https://hannes-vnz.github.io/Mammalatlas/)** · Single HTML file + two data files, no framework
+**[Live demo](https://USERNAME.github.io/mammalatlas/)** · Single HTML file + two data files, no framework
 
 <!-- ![Screenshot](screenshots/preview.png) -->
 
@@ -13,7 +13,8 @@ Interactive world atlas of mammals: distribution ranges as map layers, filterabl
 - Photo markers from Wikimedia Commons, each species profile links to the image's licence page
 - Markers follow the visible map area: the more you zoom in, the more species of that region appear (placed inside their range, decluttered by screen distance, photos and threatened species first)
 - Search and filters by order, family and conservation status
-- **[Insights page](https://hannes-vnz.github.io/Mammalatlas/insights.html):** an analysis dashboard on top of the same data
+- **Extinct species mode:** switch to "† Ausgestorben" for an atlas of extinct mammals with a timeline slider (with a time-lapse), cause filter and species profiles. The bundled `data/extinct_species.json` is a small hand-curated seed (12 species, unverified); the crawler replaces it with a much larger, sourced dataset.
+- **[Insights page](https://USERNAME.github.io/mammalatlas/insights.html):** an analysis dashboard on top of the same data
   - hotspot map with four views (species richness, threatened species, share threatened, endemism index), order filter, 2° / 4° grid and a 3D mode
   - region explorer: click a cell to see its species with status, photo and a link into the atlas
   - latitude profile, conservation-status donut, most threatened orders, range-size distribution, smallest and largest ranges, sortable family table
@@ -53,17 +54,24 @@ python -m http.server 8000
 ## Project structure
 
 ```
-index.html        # atlas (map, filters, species profiles)
+index.html        # atlas (map, filters, species profiles, extinct species mode)
 insights.html     # analysis page (hotspots, statistics)
-data/             # species_part_1.txt, species_part_2.txt
+data/             # species_part_1.txt, species_part_2.txt, extinct_species.json, provenance.json (after a crawl)
+tools/crawler.py  # data crawler (Wikidata, Wikipedia, Commons, GBIF), standard library only
+tests/            # offline tests for the crawler (pytest)
 ```
 
 Both pages share the same small core (range parsing, point-in-polygon, marker selection, richness raster), kept in one block marked `ATLAS-CORE` at the top of each script.
 
+## Keeping the data current
+
+[`tools/crawler.py`](tools/README.md) pulls current data from open sources, fills gaps (missing photos, weights, lifespans), adds species that are not in the atlas yet and builds the extinct-species dataset. It never deletes rows, writes a preview by default and records where every changed value came from in `data/provenance.json`.
+
 ## Ideas / roadmap
 
 - More analysis pages (e.g. body size vs. threat status, taxonomy explorer)
-- Reproducible data pipeline (script + documented sources) in this repository
+- Run the crawler on the full dataset, review the report and commit the refreshed data
+- Authoritative range maps and status from the IUCN Red List (needs a free API token and respect for its terms)
 - Replace icon-only image entries with real photos, fill in lifespan data
 
 ## Built with

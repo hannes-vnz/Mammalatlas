@@ -326,3 +326,36 @@ def test_merge_mit_mdd_synonym_ne_haustier_und_ohne_doppel():
     assert rep["uebersprungen_haustier"] == 1 and out[2][4] == "NE" and prov["Neue_art"]["source"] == "mdd"
     _, rep, _ = c.merge_species([["X", "Aaa_bbb", "", "", "DD", "", "? kg", "? J.", ""]], [{"sciName": "Aaa bbb", "status": "NE"}], update_status=True)
     assert rep["status_geaendert"] == []                                   # NE ersetzt keine echte Bewertung
+
+
+def test_merge_apply_ueberschreibt_keine_sicherung(tmp_path):
+    d = tmp_path / "data"; d.mkdir()
+    c.write_species(d, [list(r) for r in ROWS])
+    original = (d / "species_part_1.txt").read_text(encoding="utf-8")
+    (tmp_path / "taxa.json").write_text(json.dumps(TAXA), encoding="utf-8")
+    args = ["merge", "--data", str(d), "--taxa", str(tmp_path / "taxa.json"), "--gbif", str(tmp_path / "x.json"), "--apply"]
+    c.main(args); c.main(args)                                            # zweimal am selben Tag
+    backups = sorted((d / ".backup").iterdir())
+    assert len(backups) == 2 and (backups[0] / "species_part_1.txt").read_text(encoding="utf-8") == original
+    assert len(c.read_species(d)) == 3                                    # zweites Anwenden aendert nichts
+
+
+def test_karte_als_titelbild_wird_durch_wikidata_bild_ersetzt():
+    assert c.looks_like_map("Monodelphis_kunsi_area.png") and c.looks_like_map("250px-Distribution_of_Foo.png")
+    assert not c.looks_like_map("Vulpes_vulpes.jpg") and not c.looks_like_map("Project_Area_-_2012.jpg")
+    assert c.needs_image("https://upload.wikimedia.org/x/250px-Banka_Shrew_area.png")
+    pages = {"query": {"pages": [
+        {"title": "Kunsi", "pageprops": {"wikibase_item": "Q1"}, "pageimage": "Monodelphis_kunsi_area.png",
+         "thumbnail": {"source": "https://upload/thumb/Monodelphis_kunsi_area.png"}, "extract": "Ein Opossum."},
+        {"title": "Fuchs", "pageprops": {"wikibase_item": "Q2"}, "pageimage": "Fuchs.jpg", "thumbnail": {"source": "https://upload/thumb/Fuchs.jpg"}}]}}
+    def lic(p):
+        return {"query": {"pages": [{"title": "File:" + t[5:].replace("_", " "), "imageinfo": [{"thumburl": "https://upload/250px-" + t[5:],
+                "extmetadata": {"LicenseShortName": {"value": "CC BY 4.0"}}}]} for t in p["titles"].split("|")]}}
+    http = Fake([(lambda u, p: u == c.WIKIPEDIA_API, pages), (lambda u, p: u == c.COMMONS_API, lic)])
+    sp = [{"qid": "Q1", "wikiTitle": "Kunsi", "imageFile": "Kunsi_photo.jpg", "img": "https://alt/karte.png"},
+          {"qid": "Q2", "wikiTitle": "Fuchs", "imageFile": None},
+          {"qid": "Q3", "imageFile": "Q3_range_map.png"}]
+    c.enrich(http, sp, log=lambda *a: None)
+    assert sp[0]["img"] == "https://upload/250px-Kunsi_photo.jpg" and sp[0]["imgSource"] == "wikidata" and sp[0]["summary"] == "Ein Opossum."
+    assert sp[1]["img"] == "https://upload/thumb/Fuchs.jpg" and sp[1]["imgSource"] == "wikipedia" and sp[1]["imgLicense"] == "CC BY 4.0"
+    assert "img" not in sp[2]                                              # Karte aus Wikidata wird auch nicht genommen

@@ -49,4 +49,4 @@ Wikipedia text is CC BY-SA, images carry the licence stored per species, GBIF re
 
 ## Tests
 
-`pytest tests/test_crawler.py` runs offline against mocked API answers (20 tests). The crawler has not been run against the live services in this repository's build environment, so do a small first run and check the output before a full crawl.
+`pytest tests/test_crawler.py` runs offline against mocked API answers (22 tests). The crawler has not been run against the live services in this repository's build environment, so do a small first run and check the output before a full crawl.

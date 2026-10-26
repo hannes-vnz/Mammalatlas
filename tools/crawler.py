@@ -345,7 +345,6 @@ NAME_QUERY = """
 SELECT ?item ?name ?label ?status ?statusLabel ?iucn ?gbif ?image ?mass ?life ?title WHERE {{
   VALUES ?name {{ {values} }}
   ?item wdt:P225 ?name ; wdt:P105 wd:{sp} .
-  ?item wdt:P171+ ?anc . FILTER(?anc = wd:{mammalia})   # Pfad vom Item aus aufwaerts, nicht von Mammalia abwaerts
   OPTIONAL {{ ?item wdt:P141 ?status . }}
   OPTIONAL {{ ?item wdt:P627 ?iucn . }}
   OPTIONAL {{ ?item wdt:P846 ?gbif . }}
@@ -359,12 +358,15 @@ SELECT ?item ?name ?label ?status ?statusLabel ?iucn ?gbif ?image ?mass ?life ?t
 
 
 def wikidata_by_names(http, names, batch=60):
-    """{Name (klein): Wikidata-Datensatz} fuer wissenschaftliche Namen; bei mehreren Items das mit den meisten Angaben."""
+    """{Name (klein): Wikidata-Datensatz} fuer wissenschaftliche Namen; bei mehreren Items das mit den meisten Angaben.
+    Ohne Pruefung 'gehoert zu Mammalia': der Pfad wdt:P171+ laesst die Abfrage auf WDQS in den Timeout laufen
+    (gemessen: 5 s ohne, >60 s mit). Die Namen kommen aus MDD, gleichnamige Nicht-Saeuger sind die seltene Ausnahme;
+    Items mit IUCN-ID und Wikipedia-Artikel werden bevorzugt."""
     out = {}
     for part in chunks(sorted({n.replace("_", " ") for n in names}), batch):
         rows = sparql(http, NAME_QUERY.format(values=" ".join(json.dumps(n, ensure_ascii=False) for n in part), sp=Q_SPECIES, mammalia=Q_MAMMALIA))
         for s in collapse_rows(rows, ""):
-            score = (bool(s["wikiTitle"]), bool(s["iucnId"]), bool(s["imageFile"]))
+            score = (bool(s["iucnId"]), bool(s["wikiTitle"]), bool(s["gbifId"]), bool(s["imageFile"]))
             k = name_key(s["sciName"])
             if k not in out or score > out[k][0]:
                 out[k] = (score, s)
@@ -435,47 +437,74 @@ def wikipedia_pages(http, titles):
     return out
 
 
-def commons_licenses(http, files):
-    """Lizenz, Urheber und Seite je Commons-Datei (bis zu 50 pro Anfrage). Rueckgabe: {Dateiname_mit_Unterstrich: Daten}."""
+MAP_FILE = re.compile(r"(?i)(?:^|[_\-\s(])(?:distribution|range|ranges|map|verbreitung|karte|locator|location)(?:[_\-\s.)]|$)"
+                      r"|[_\s]area\.[a-z]+$|\.svg(?:\.png)?$")
+
+
+def looks_like_map(name):
+    """Verbreitungskarte statt Foto? Wikipedia waehlt bei kleinen Arten oft die Karte aus dem Infokasten als Titelbild."""
+    return bool(name and MAP_FILE.search(urllib.parse.unquote(name.rsplit("/", 1)[-1])))
+
+
+def commons_licenses(http, files, thumb_width=250):
+    """Lizenz, Urheber, Seite und Vorschaubild je Commons-Datei (bis zu 50 pro Anfrage). Rueckgabe: {Dateiname_mit_Unterstrich: Daten}."""
     data = http.get_json(COMMONS_API, {
         "action": "query", "format": "json", "formatversion": "2", "prop": "imageinfo",
-        "iiprop": "extmetadata", "iiextmetadatafilter": "LicenseShortName|Artist|LicenseUrl",
+        "iiprop": "url|extmetadata", "iiurlwidth": str(thumb_width),
+        "iiextmetadatafilter": "LicenseShortName|Artist|LicenseUrl",
         "titles": "|".join("File:" + f for f in files)})
     out = {}
     for page in data.get("query", {}).get("pages", []):
-        info = (page.get("imageinfo") or [{}])[0].get("extmetadata") or {}
+        ii = (page.get("imageinfo") or [{}])[0]
+        info = ii.get("extmetadata") or {}
         name = (page.get("title") or "")[5:].replace(" ", "_")
         if name:
             out[name] = {"license": (info.get("LicenseShortName") or {}).get("value", ""),
                          "artist": _strip_html((info.get("Artist") or {}).get("value", ""))[:120],
                          "licenseUrl": (info.get("LicenseUrl") or {}).get("value", ""),
+                         "thumb": ii.get("thumburl", ""),
                          "page": "https://commons.wikimedia.org/wiki/File:" + urllib.parse.quote(name)}
     return out
 
 
 def enrich(http, species, log=print):
-    """Ergaenzt wikiTitle-Arten um img, imageFile, summary und Lizenzangaben (veraendert die Liste)."""
+    """Ergaenzt Arten um img, imageFile, summary und Lizenzangaben (veraendert die Liste).
+    Foto: Wikipedia-Titelbild, wenn es keine Karte ist, sonst das Wikidata-Bild (P18) als Commons-Vorschau."""
+    for s in species:                  # Bildangaben frueherer Laeufe verwerfen, Wikidata-Bild merken
+        s.setdefault("p18", s.get("imageFile"))
+        for k in ("img", "imgLicense", "imgArtist", "imgPage", "imgSource"):
+            s.pop(k, None)
     with_title = [s for s in species if s.get("wikiTitle")]
-    by_qid = {s["qid"]: s for s in species}
+    by_qid = {s["qid"]: s for s in species if s.get("qid")}
     for i, batch in enumerate(chunks(with_title, 20), 1):
         for q, d in wikipedia_pages(http, [s["wikiTitle"] for s in batch]).items():
             s = by_qid.get(q)
             if not s:
                 continue
-            if d["img"]:
-                s["img"], s["imageFile"] = d["img"], d["imageFile"] or s.get("imageFile")
+            if d["img"] and d["imageFile"] and not looks_like_map(d["imageFile"]):
+                s["img"], s["imageFile"], s["imgSource"] = d["img"], d["imageFile"], "wikipedia"
             if d["summary"]:
                 s["summary"] = d["summary"]
         if i % 10 == 0:
             log(f"  Wikipedia: {i * 20}/{len(with_title)}")
-    files = sorted({s["imageFile"] for s in species if s.get("img") and s.get("imageFile")})
+    for s in species:
+        if not s.get("img") and s.get("p18") and not looks_like_map(s["p18"]):
+            s["imageFile"], s["imgSource"] = s["p18"], "wikidata"
+    files = sorted({s["imageFile"] for s in species if s.get("imgSource")})
     meta = {}
     for batch in chunks(files, 50):
         meta.update(commons_licenses(http, batch))
     for s in species:
-        m = meta.get(s.get("imageFile") or "")
-        if m:
-            s["imgLicense"], s["imgArtist"], s["imgPage"] = m["license"], m["artist"], m["page"]
+        m = meta.get(s.get("imageFile") or "") if s.get("imgSource") else None
+        if not m:
+            s.pop("imgSource", None)
+            continue
+        if s["imgSource"] == "wikidata":
+            if not m["thumb"]:
+                s.pop("imgSource")
+                continue
+            s["img"] = m["thumb"]
+        s["imgLicense"], s["imgArtist"], s["imgPage"] = m["license"], m["artist"], m["page"]
     return species
 
 
@@ -628,11 +657,10 @@ def crawl_gbif(http, names, max_species=200, max_records=300, log=print, keys=No
     for i, name in enumerate(names[:max_species], 1):
         try:
             key = int(keys[name]) if str(keys.get(name) or "").isdigit() else gbif_key(http, name)
-            if not key:
-                continue
-            summary = occurrence_summary(gbif_occurrences(http, key, max_records))
-            summary["gbifKey"] = key
-            out[name] = summary
+            if key:
+                summary = occurrence_summary(gbif_occurrences(http, key, max_records))
+                summary["gbifKey"] = key
+                out[name] = summary
         except CrawlError as e:
             log(f"  GBIF {name}: {e}")
         if i % 25 == 0:
@@ -717,7 +745,7 @@ ITEM_QUERY = """
 SELECT ?item ?name ?label ?status ?statusLabel ?iucn ?gbif ?image ?mass ?life ?famName ?orderName ?title WHERE {{
   VALUES ?item {{ {values} }}
   ?item wdt:P105 ?rank . FILTER(?rank IN (wd:{sp}, wd:{ssp}))
-  ?item wdt:P225 ?name . ?item wdt:P171+ ?anc . FILTER(?anc = wd:{mammalia})
+  ?item wdt:P225 ?name .
   OPTIONAL {{ ?item wdt:P141 ?status . }}
   OPTIONAL {{ ?item wdt:P627 ?iucn . }}
   OPTIONAL {{ ?item wdt:P846 ?gbif . }}
@@ -837,7 +865,7 @@ def write_species(data_dir, rows):
 
 
 def needs_image(img):
-    return not img.startswith("http") or "Status_iucn" in img
+    return not img.startswith("http") or "Status_iucn" in img or looks_like_map(img)
 
 
 def name_key(name):
@@ -881,7 +909,7 @@ def merge_species(rows, taxa, gbif=None, update_status=False, add_new=True):
             row, p = rows[i], {}
             if needs_image(row[5]) and s.get("img") and s.get("imgLicense"):
                 row[5] = s["img"]; rep["bilder"] += 1
-                p["img"] = {"source": "wikipedia", "license": s["imgLicense"], "page": s.get("imgPage", "")}
+                p["img"] = {"source": s.get("imgSource", "wikipedia"), "license": s["imgLicense"], "page": s.get("imgPage", "")}
             if row[6].startswith("?") and fmt_weight(s.get("massG")):
                 row[6] = fmt_weight(s["massG"]); rep["gewichte"] += 1
                 p["weight"] = (s.get("traitSource") or {}).get("massG", "wikidata")
@@ -920,7 +948,7 @@ def merge_species(rows, taxa, gbif=None, update_status=False, add_new=True):
             rep["neu"] += 1
             prov[name.replace(" ", "_")] = {"added": date.today().isoformat(), "source": src,
                                             **({"range": "gbif-hull (grobe Naeherung)"} if g.get("range") else {}),
-                                            **({"img": {"source": "wikipedia", "license": s["imgLicense"], "page": s.get("imgPage", "")}} if img else {})}
+                                            **({"img": {"source": s.get("imgSource", "wikipedia"), "license": s["imgLicense"], "page": s.get("imgPage", "")}} if img else {})}
     return rows, rep, prov
 
 
@@ -1073,8 +1101,13 @@ def main(argv=None, http=None):
         new_rows, rep, prov = merge_species(rows, _load(a.taxa), gb, a.update_status, not a.no_new)
         print_report(rep)
         if a.apply:
-            backup = Path(a.data) / ".backup" / date.today().isoformat()
-            backup.mkdir(parents=True, exist_ok=True)
+            stamp = date.today().isoformat()
+            backup = Path(a.data) / ".backup" / stamp
+            n = 1
+            while backup.exists():          # vorhandene Sicherung nie ueberschreiben (zweiter Lauf am selben Tag)
+                n += 1
+                backup = Path(a.data) / ".backup" / f"{stamp}_{n}"
+            backup.mkdir(parents=True)
             for n in ("species_part_1.txt", "species_part_2.txt"):
                 (backup / n).write_text((Path(a.data) / n).read_text(encoding="utf-8"), encoding="utf-8")
             write_species(a.data, new_rows)

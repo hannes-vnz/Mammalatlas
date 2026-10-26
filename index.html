@@ -44,6 +44,16 @@
   
   .search-box { width: 100%; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 6px; font-size: 13px; }
   .search-box:focus { outline: none; border-color: var(--accent); }
+  .search-results { margin-top: 6px; display: flex; flex-direction: column; gap: 1px; max-height: 260px; overflow-y: auto; }
+  .search-results:empty { display: none; }
+  .search-results .hit { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: none; color: var(--text); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+  .search-results .hit:hover, .search-results .hit:focus-visible { background: var(--panel-2); outline: none; }
+  .search-results .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .search-results .names { flex: 1; min-width: 0; }
+  .search-results .names div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .search-results .sci { color: var(--text-dim); font-style: italic; font-size: 11px; }
+  .search-results .tag { flex: none; font-size: 10px; color: var(--text-dim); border: 1px solid var(--border); border-radius: 10px; padding: 1px 6px; }
+  .search-results .more { font-size: 11px; color: var(--text-dim); padding: 4px 8px; }
   
   .stats { font-size: 11px; color: var(--text-dim); padding-top: 16px; border-top: 1px solid var(--border-soft); margin-top: 8px; }
   .stats strong { color: var(--accent); font-size: 22px; display: block; font-weight: 600; }
@@ -192,6 +202,7 @@
     <div class="filter-group living-only">
       <h3>Suche</h3>
       <input type="text" class="search-box" id="search" placeholder="Name, Familie, Ordnung…" />
+      <div class="search-results" id="search-results" aria-label="Suchtreffer"></div>
     </div>
     
     <div class="filter-group living-only">
@@ -839,6 +850,7 @@ function applyFilters() {
 
   document.getElementById("visible-count").textContent = state.currentFilteredList.length;
   renderMarkers();
+  renderSearchResults();
   
   if (state.selectedId) { 
     const isStillVisible = state.currentFilteredList.some(s => s.id === state.selectedId);
@@ -846,8 +858,42 @@ function applyFilters() {
   }
 }
 
+// Trefferliste unter der Suche: findet auch Arten ohne Verbreitungsgebiet, die auf der Karte fehlen
+const MAX_SEARCH_HITS = 30;
+function renderSearchResults() {
+  const box = document.getElementById("search-results");
+  const term = (state.search || "").trim();
+  box.innerHTML = "";
+  if (term.length < 2) return;
+  const rank = s => {
+    const c = (s.common || "").toLowerCase(), n = (s.sciName || "").toLowerCase();
+    if (c === term || n === term) return 0;
+    if (c.startsWith(term) || n.startsWith(term)) return 1;
+    if (c.includes(term) || n.includes(term)) return 2;
+    return 3;                                  // Treffer ueber Familie oder Ordnung
+  };
+  const hits = state.currentFilteredList.map(s => [rank(s), s])
+    .sort((a, b) => (a[0] - b[0]) || (a[1].common || "").localeCompare(b[1].common || ""));
+  hits.slice(0, MAX_SEARCH_HITS).forEach(([, sp]) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "hit";
+    b.innerHTML = `<span class="dot" style="background:${STATUS_COLORS[sp.status] || "#888"}"></span>
+      <span class="names"><div>${esc(sp.common || sp.sciName)}</div><div class="sci">${esc(sp.sciName)}</div></span>
+      ${sp.range ? "" : '<span class="tag">ohne Karte</span>'}`;
+    b.onclick = () => selectSpecies(sp.id);
+    box.appendChild(b);
+  });
+  if (hits.length > MAX_SEARCH_HITS) {
+    const more = document.createElement("div");
+    more.className = "more";
+    more.textContent = `+ ${hits.length - MAX_SEARCH_HITS} weitere, Suche genauer eingeben`;
+    box.appendChild(more);
+  }
+}
+
 const PROV = {};
 function rangeNote(sp) {
+  if (!sp.range) return '<p class="range-note">Für diese Art ist noch kein Verbreitungsgebiet hinterlegt, deshalb fehlt sie auf der Karte.</p>';
   const p = PROV[sp.sciName.replace(/ /g, "_")] || {};
   return p.range && String(p.range).startsWith("gbif")
     ? '<p class="range-note">Verbreitungsgebiet: grobe Näherung aus GBIF-Fundpunkten, nicht aus Expertenkarten.</p>' : "";

@@ -503,3 +503,23 @@ def test_kleine_insel_bleibt_und_unterart_zaehlt_zur_art(tmp_path):
     write_shapefile(tmp_path / "S", [({"sci_name": "Sminthopsis aitkeni ssp. x", "presence": 1, "origin": 1}, [island])])
     r = c.iucn_ranges([tmp_path / "S.shp"], log=lambda *a: None)
     assert list(r) == ["Sminthopsis aitkeni"] and len(r["Sminthopsis aitkeni"].split(";")) >= 4
+
+
+def test_feine_gebiete_in_dateien_verteilt(tmp_path):
+    assert c.range_bucket("Sus_scrofa") == c.range_bucket("Sus_scrofa") and 0 <= c.range_bucket("Sus_scrofa") < 64
+    assert c.range_bucket("abc") == ((((5381 * 33 + 97) * 33 + 98) * 33 + 99) & 0xFFFFFFFF) % 64   # wie in index.html
+    rows = [["Boar", "Sus_scrofa", "", "", "LC", "", "", "", ""], ["Armadillo", "Chaetophractus_vellerosus", "", "", "LC", "", "", "", ""]]
+    taxa = [{"sciName": "Dasyphractus vellerosus", "synonyms": ["Chaetophractus vellerosus"]}]
+    (tmp_path / "ranges").mkdir(); (tmp_path / "ranges" / "99.json").write_text("{}")
+    n = c.write_detail_ranges(tmp_path, rows, {"Sus scrofa": "fein1", "Dasyphractus vellerosus": "fein2"}, taxa)
+    files = {p.name: json.loads(p.read_text()) for p in (tmp_path / "ranges").glob("*.json")}
+    assert n == 2 and "99.json" not in files
+    assert files[f"{c.range_bucket('Sus_scrofa'):02d}.json"]["Sus_scrofa"] == "fein1"
+    assert files[f"{c.range_bucket('Chaetophractus_vellerosus'):02d}.json"]["Chaetophractus_vellerosus"] == "fein2"
+
+
+def test_grob_und_fein_aus_einem_lauf(tmp_path):
+    wavy = [(i / 50, 50 + 0.02 * (i % 2)) for i in range(0, 1001)] + [(20, 40), (0, 40), (0, 50)]
+    write_shapefile(tmp_path / "W", [({"sci_name": "Vulpes vulpes", "presence": 1, "origin": 1}, [wavy])])
+    coarse, fine = c.iucn_ranges([tmp_path / "W.shp"], log=lambda *a: None, detail=(0.005, 5000))
+    assert len(fine["Vulpes vulpes"].split(";")) > len(coarse["Vulpes vulpes"].split(";")) >= 4

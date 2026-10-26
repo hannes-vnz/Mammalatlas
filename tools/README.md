@@ -24,7 +24,7 @@ python tools/crawler.py traits --anage anage_data.txt --pantheria PanTHERIA_1-0_
 python tools/crawler.py --contact $CONTACT gbif --max-species 300     # rough ranges for species without a polygon
 python tools/crawler.py --contact $CONTACT extinct                    # crawl/extinct_species.json (check, then copy to data/)
 python tools/crawler.py ranges --shp sources/iucn                     # range outlines from the IUCN "Mammals" shapefiles (all parts, simplified)
-python tools/crawler.py merge --ranges crawl/ranges.json              # preview; replaces existing ranges with the IUCN ones
+python tools/crawler.py merge --ranges crawl/ranges.json --ranges-detail crawl/ranges_detail.json --apply   # replace ranges, write detail files
 python tools/crawler.py merge                                         # preview of what would change
 python tools/crawler.py merge --apply --update-status                 # write species_part_*.txt (backup in data/.backup)
 ```
@@ -51,8 +51,8 @@ Wikipedia text is CC BY-SA, images carry the licence stored per species, GBIF re
 
 ## Tests
 
-`pytest tests/test_crawler.py` runs offline against mocked API answers (30 tests). The crawler has not been run against the live services in this repository's build environment, so do a small first run and check the output before a full crawl.
+`pytest tests/test_crawler.py` runs offline against mocked API answers (32 tests). The crawler has not been run against the live services in this repository's build environment, so do a small first run and check the output before a full crawl.
 
 ## Range outlines
 
-The original range column held only one part of the range for many widespread species (wild boar: a patch on Samos). `ranges` rebuilds them from the IUCN spatial data (request "Mammals" as Shapefile on iucnredlist.org, unzip to `sources/iucn/`, not committed): extant/probably extant, native/reintroduced/assisted colonisation, all parts, holes dropped, Douglas-Peucker 0.08° (about 8 km), at most 900 points per species, small islands kept with a finer tolerance, subspecies maps counted for their species. A full run takes about an hour; `--only-missing crawl/ranges.json` adds species missing from an earlier run in seconds. Raw IUCN data is not redistributed; cite the IUCN Red List.
+The original range column held only one part of the range for many widespread species (wild boar: a patch on Samos). `ranges` rebuilds them from the IUCN spatial data (request "Mammals" as Shapefile on iucnredlist.org, unzip to `sources/iucn/`, not committed): extant/probably extant, native/reintroduced/assisted colonisation, all parts, holes dropped, two versions in one pass: a coarse one in the species files (Douglas-Peucker 0.08°, about 8 km, at most 900 points, used for markers and statistics) and a detailed one (0.015°, about 1.5 km) in `data/ranges/NN.json` (64 files, bucket = djb2 of the species key, same in index.html) that the page loads only when a species is opened, small islands kept with a finer tolerance, subspecies maps counted for their species. A full run takes about 6 minutes; `--only-missing crawl/ranges.json` adds species missing from an earlier run in seconds. Raw IUCN data is not redistributed; cite the IUCN Red List.

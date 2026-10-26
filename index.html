@@ -440,15 +440,46 @@ function pickMarkers(list, view, project, opts) {
     if (sp.anchor && inBox(sp.anchor, view)) return sp.anchor;
     return viewAnchor(sp.range, view);
   };
+  // Ist der erste Punkt belegt (alle Arten, die den ganzen Ausschnitt abdecken, landen sonst in der Bildmitte),
+  // weitere Punkte im Gebiet probieren: ein Raster mit etwa Markerabstand ueber Gebiet und Ausschnitt.
+  const placeElsewhere = sp => {
+    const r = sp.range, boxes = [];
+    for (let i = 0; i < r.boxes.length; i++) {
+      const b = r.boxes[i];
+      if (!boxesIntersect(b, view)) continue;
+      const ix = [Math.max(b[0], view[0]), Math.max(b[1], view[1]), Math.min(b[2], view[2]), Math.min(b[3], view[3])];
+      boxes.push({ i, ix, area: (ix[2] - ix[0]) * (ix[3] - ix[1]) });
+    }
+    boxes.sort((p, q) => q.area - p.area);
+    for (const { i, ix } of boxes.slice(0, 3)) {
+      const a = project(ix[0], ix[3]), z = project(ix[2], ix[1]);
+      const nx = Math.min(12, Math.max(1, Math.floor(Math.abs(z[0] - a[0]) / minDist)));
+      const ny = Math.min(12, Math.max(1, Math.floor(Math.abs(z[1] - a[1]) / minDist)));
+      // Rasterpunkte von der Mitte nach aussen, je Art leicht und immer gleich versetzt (wirkt nicht wie ein Gitter)
+      let seed = (Number(sp.id) || 0) * 2654435761 >>> 0;
+      const rnd = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296) - 0.5;
+      const pts = [];
+      for (let gy = 0; gy < ny; gy++) for (let gx = 0; gx < nx; gx++) {
+        const fx = (gx + 0.5 + 0.7 * rnd()) / nx, fy = (gy + 0.5 + 0.7 * rnd()) / ny;
+        pts.push([ix[0] + (ix[2] - ix[0]) * fx, ix[1] + (ix[3] - ix[1]) * fy, (fx - 0.5) ** 2 + (fy - 0.5) ** 2]);
+      }
+      pts.sort((p, q) => p[2] - q[2]);
+      for (const [x, y] of pts) {
+        const p = project(x, y);
+        if (free(p[0], p[1]) && pointInRing(x, y, r.rings[i]) && place(sp, [x, y])) return true;
+      }
+    }
+    return false;
+  };
   if (opts.forceId != null) {
     const f = list.find(s => s.id === opts.forceId);
-    if (f) { const pos = resolve(f); if (pos) place(f, pos); }
+    if (f) { const pos = resolve(f); if (pos && !place(f, pos)) placeElsewhere(f); }
   }
   for (const sp of list) {
     if (out.length >= cap) break;
     if (sp.id === opts.forceId) continue;
     const pos = resolve(sp);
-    if (pos) place(sp, pos);
+    if (pos && !place(sp, pos)) placeElsewhere(sp);
   }
   return out;
 }
@@ -742,6 +773,19 @@ function renderMarkers() {
   });
 }
 
+// Feine Gebiete liegen in 64 Dateien; die Nummer ergibt sich aus dem Namen (djb2, wie range_bucket im Crawler)
+const DETAIL_BUCKETS = 64, detailFiles = new Map();
+function rangeBucket(key) {
+  let h = 5381;
+  for (let i = 0; i < key.length; i++) h = (Math.imul(h, 33) + key.charCodeAt(i)) >>> 0;
+  return h % DETAIL_BUCKETS;
+}
+function loadDetailRange(sp) {
+  const key = sp.sciName.replace(/ /g, "_"), b = String(rangeBucket(key)).padStart(2, "0");
+  if (!detailFiles.has(b)) detailFiles.set(b, fetch(`./data/ranges/${b}.json`).then(r => r.ok ? r.json() : {}).catch(() => ({})));
+  return detailFiles.get(b).then(d => d[key] ? parseRange(d[key]) : null);
+}
+
 function rangeGeometry(sp) {
   if (!sp.range) return null;
   return {
@@ -764,6 +808,12 @@ function selectSpecies(id) {
   window._map.getSource("selected-range").setData({
     type: "FeatureCollection",
     features: sp.range ? [{ type: "Feature", properties: { color: STATUS_COLORS[sp.status] || "#888" }, geometry: rangeGeometry(sp) }] : []
+  });
+  // Feines Gebiet nachladen (data/ranges/NN.json); bis dahin bleibt der grobe Umriss sichtbar
+  loadDetailRange(sp).then(range => {
+    if (!range || state.selectedId !== sp.id) return;
+    window._map.getSource("selected-range").setData({ type: "FeatureCollection",
+      features: [{ type: "Feature", properties: { color: STATUS_COLORS[sp.status] || "#888" }, geometry: rangeGeometry({ range }) }] });
   });
 
   if (window.innerWidth <= 900) {
@@ -895,8 +945,11 @@ const PROV = {};
 function rangeNote(sp) {
   if (!sp.range) return '<p class="range-note">Für diese Art ist noch kein Verbreitungsgebiet hinterlegt, deshalb fehlt sie auf der Karte.</p>';
   const p = PROV[sp.sciName.replace(/ /g, "_")] || {};
-  return p.range && String(p.range).startsWith("gbif")
-    ? '<p class="range-note">Verbreitungsgebiet: grobe Näherung aus GBIF-Fundpunkten, nicht aus Expertenkarten.</p>' : "";
+  if (p.range && String(p.range).startsWith("gbif"))
+    return '<p class="range-note">Verbreitungsgebiet: grobe Näherung aus GBIF-Fundpunkten, nicht aus Expertenkarten.</p>';
+  if (p.range === "iucn-polygons")
+    return '<p class="range-note">Verbreitungsgebiet: The IUCN Red List of Threatened Species (Kartendownload 10/2026, vereinfacht; heimische und wiederangesiedelte Vorkommen).</p>';
+  return "";
 }
 
 function showSpeciesDetail(sp) {

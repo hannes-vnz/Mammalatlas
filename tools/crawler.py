@@ -808,10 +808,13 @@ def _prep_ring(ring, tol, digits):
     return simplify(pts, tol) if len(pts) >= 4 else pts
 
 
-def iucn_ranges(shps, presence=(1, 2), origin=(1, 2, 6), log=print, tol=0.08, max_points=900, min_area=0.002, digits=2, only=None):
+def iucn_ranges(shps, presence=(1, 2), origin=(1, 2, 6), log=print, tol=0.08, max_points=900, min_area=0.002, digits=2, only=None,
+                detail=None):
     """{wissenschaftlicher Name: Gebiet} aus IUCN-Shapefiles. Standard: vorkommend/wahrscheinlich vorkommend,
     heimisch/wiederangesiedelt/gezielt angesiedelt (eingeschleppte Vorkommen wie Wildschwein in Amerika nicht).
-    Jede Flaeche wird schon beim Lesen vereinfacht, damit auch Gigabyte-Dateien in den Speicher passen."""
+    Jede Flaeche wird schon beim Lesen vereinfacht, damit auch Gigabyte-Dateien in den Speicher passen.
+    detail=(Toleranz, Punkte): zusaetzlich feine Fassung zum Nachladen; Rueckgabe dann (grob, fein)."""
+    prep_tol = detail[0] if detail else tol
     rings_by, small, n = {}, {}, 0
     pairs = ((a, s) for shp in shps for a, s in zip(read_dbf(str(shp)[:-4] + ".dbf"), read_shp_records(shp)))
     for attrs, raw in pairs:
@@ -833,23 +836,56 @@ def iucn_ranges(shps, presence=(1, 2), origin=(1, 2, 6), log=print, tol=0.08, ma
                 if -a > small.get(name, (0, None))[0]:
                     small[name] = (-a, ring)
                 continue
-            r = _prep_ring(ring, tol, digits)
+            r = _prep_ring(ring, prep_tol, digits)
             if len(r) < 4:
-                r = _prep_ring(ring, tol / 10, digits + 1)
+                r = _prep_ring(ring, prep_tol / 10, digits + 1)
             if len(r) >= 4:
                 rings_by.setdefault(name, []).append(r)
     for name, (_, ring) in small.items():                # Arten, die nur aus kleinen Inseln bestehen
         if name not in rings_by:
-            r = _prep_ring(ring, tol / 10, digits + 1)
+            r = _prep_ring(ring, prep_tol / 10, digits + 1)
             if len(r) >= 4:
                 rings_by[name] = [r]
     log(f"  {n} Polygone, {len(rings_by)} Arten mit Gebiet; begrenze Punktzahl ...")
-    out = {}
+    out, fine = {}, {}
     for name, rings in rings_by.items():
-        r = build_range(rings, tol=tol, max_points=max_points, min_area=0, digits=digits + (1 if name in small and len(rings) == 1 else 0))
+        dg = digits + (1 if name in small and len(rings) == 1 else 0)
+        r = build_range(rings, tol=tol, max_points=max_points, min_area=0, digits=dg)
         if r:
             out[name] = r
-    return out
+            if detail:
+                fine[name] = build_range(rings, tol=detail[0], max_points=detail[1], min_area=0, digits=dg)
+    return (out, fine) if detail else out
+
+
+def range_bucket(key, n=64):
+    """Datei-Nummer fuer das feine Gebiet einer Art (djb2, identisch in index.html)."""
+    h = 5381
+    for ch in key:
+        h = (h * 33 + ord(ch)) & 0xFFFFFFFF
+    return h % n
+
+
+def write_detail_ranges(data_dir, rows, detail, taxa=(), n=64):
+    """Feine Gebiete je Atlasart (Schluessel wie in den Artendateien) in data/ranges/NN.json verteilen."""
+    alias = {}
+    for s in taxa:
+        for nm in [s["sciName"]] + list(s.get("synonyms") or []):
+            alias.setdefault(name_key(nm), []).append(name_key(s["sciName"]))
+    by = {name_key(k): v for k, v in detail.items()}
+    buckets = {}
+    for r in rows:
+        k = name_key(r[1])
+        v = by.get(k) or next((by[a] for a in alias.get(k, []) if a in by), None)
+        if v:
+            buckets.setdefault(range_bucket(r[1], n), {})[r[1]] = v
+    folder = Path(data_dir) / "ranges"
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.glob("*.json"):
+        old.unlink()
+    for b, part in buckets.items():
+        (folder / f"{b:02d}.json").write_text(json.dumps(part, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    return sum(len(p) for p in buckets.values())
 
 
 def replace_ranges(rows, ranges, taxa=()):
@@ -1405,6 +1441,9 @@ def build_parser():
     rg.add_argument("--max-points", type=int, default=900, help="hoechstens so viele Punkte je Art")
     rg.add_argument("--min-area", type=float, default=0.002, help="kleinere Teilflaechen (Grad^2) weglassen, die groesste bleibt")
     rg.add_argument("--only-missing", default="", help="nur Arten, die in dieser ranges.json noch fehlen (ergaenzt sie)")
+    rg.add_argument("--detail-tolerance", type=float, default=0.015, help="feine Fassung zum Nachladen (0,015 = ca. 1,5 km)")
+    rg.add_argument("--detail-max-points", type=int, default=25000)
+    rg.add_argument("--detail-out", default="crawl/ranges_detail.json")
     rg.add_argument("--out", default="crawl/ranges.json")
 
     th = sub.add_parser("threats", help="Ursachen je Region zaehlen -> data/threats_by_region.json (ohne Netz)")
@@ -1415,6 +1454,7 @@ def build_parser():
     m.add_argument("--data", default="data"); m.add_argument("--taxa", default="crawl/taxa.json")
     m.add_argument("--gbif", default="crawl/gbif.json")
     m.add_argument("--ranges", default="", help="crawl/ranges.json: vorhandene Gebiete durch IUCN-Gebiete ersetzen")
+    m.add_argument("--ranges-detail", default="", help="crawl/ranges_detail.json: feine Gebiete nach data/ranges/ (mit --apply)")
     m.add_argument("--update-status", action="store_true", help="IUCN-Status aus Wikidata uebernehmen")
     m.add_argument("--no-new", action="store_true", help="keine neuen Arten anlegen")
     m.add_argument("--apply", action="store_true", help="Dateien wirklich schreiben (Sicherung in data/.backup)")
@@ -1499,9 +1539,14 @@ def main(argv=None, http=None):
             only = {" ".join((r.get("sci_name") or r.get("binomial") or "").split()[:2])
                     for shp in shps for r in read_dbf(str(shp)[:-4] + ".dbf")} - set(have)
             print(f"{len(only)} Arten ohne Gebiet in {a.only_missing}")
-        data = {**have, **iucn_ranges(shps, tol=a.tolerance, max_points=a.max_points, min_area=a.min_area, only=only)}
-        print(f"{len(data)} Gebiete, zusammen {sum(len(v) for v in data.values()) / 1e6:.1f} MB")
+        coarse, fine = iucn_ranges(shps, tol=a.tolerance, max_points=a.max_points, min_area=a.min_area, only=only,
+                                   detail=(a.detail_tolerance, a.detail_max_points))
+        data = {**have, **coarse}
+        have_fine = _load(a.detail_out) if a.only_missing and Path(a.detail_out).exists() else {}
+        fine = {**have_fine, **fine}
+        print(f"{len(data)} Gebiete, grob {sum(len(v) for v in data.values()) / 1e6:.1f} MB, fein {sum(len(v) for v in fine.values()) / 1e6:.1f} MB")
         _save(a.out, data)
+        _save(a.detail_out, fine)
     elif a.cmd == "threats":
         regions, total, unmatched = threat_summary(_load(a.iucn), _load(a.taxa))
         print(f"{total['species']} gefaehrdete Arten (VU/EN/CR), {unmatched} ohne Zuordnung zu MDD")
@@ -1533,6 +1578,8 @@ def main(argv=None, http=None):
             for n in ("species_part_1.txt", "species_part_2.txt"):
                 (backup / n).write_text((Path(a.data) / n).read_text(encoding="utf-8"), encoding="utf-8")
             write_species(a.data, new_rows)
+            if a.ranges_detail:
+                print(f"Feine Gebiete geschrieben: {write_detail_ranges(a.data, new_rows, _load(a.ranges_detail), taxa)}")
             pp = Path(a.data) / "provenance.json"
             old = json.loads(pp.read_text(encoding="utf-8")) if pp.exists() else {}
             old.update(prov)

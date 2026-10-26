@@ -858,6 +858,95 @@ def iucn_ranges(shps, presence=(1, 2), origin=(1, 2, 6), log=print, tol=0.08, ma
     return (out, fine) if detail else out
 
 
+def _shape_to_range(geom, digits, min_area=0.0):
+    """Shapely-Geometrie -> Atlasformat; nur Aussenringe, groesste zuerst, kleine Teile ausser dem groessten weg.
+    Gerundet wird mit set_precision: einfaches Runden der Koordinaten erzeugt Selbstueberschneidungen, und solche
+    Flaechen fuellt die Karte nur teilweise (schwarze Loecher)."""
+    import shapely
+    from shapely.errors import GEOSException
+    snapped = None
+    for g in (geom, shapely.make_valid(geom), geom.buffer(0)):
+        try:
+            snapped = shapely.set_precision(g, 10 ** -digits)
+            break
+        except GEOSException:                          # ungueltige Eingabe: naechste Reparatur versuchen
+            continue
+    geom = snapped if snapped is not None else geom.buffer(0)
+    if not geom.is_valid:
+        geom = geom.buffer(0)
+
+    def flat(g):                                       # make_valid kann Sammlungen mit Linien liefern
+        if g.geom_type == "Polygon":
+            return [g]
+        return [p for sub in getattr(g, "geoms", []) for p in flat(sub)]
+    polys = flat(geom)
+    polys = sorted((p for p in polys if not p.is_empty), key=lambda p: -p.area)
+    parts = []
+    for i, p in enumerate(polys):
+        if i and p.area < min_area:
+            continue
+        pts = []
+        for x, y in p.exterior.coords:
+            q = (round(x, digits), round(y, digits))
+            if not pts or q != pts[-1]:
+                pts.append(q)
+        if len(pts) >= 4:
+            parts.append(pts)
+    return "*".join(";".join(f"{x:g}|{y:g}" for x, y in p) for p in parts)
+
+
+def iucn_ranges_union(shps, presence=(1, 2), origin=(1, 2, 6), log=print, tol=0.08, max_points=900, min_area=0.002,
+                      digits=2, only=None, detail=(0.01, 30000)):
+    """Wie iucn_ranges, aber mit Shapely: alle Teilflaechen einer Art werden verschmolzen (keine doppelt
+    eingefaerbten Ueberlappungen, keine Innenkanten) und danach topologiesicher vereinfacht. Rueckgabe (grob, fein)."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    prep = detail[0] / 3
+    polys_by, n = {}, 0
+    pairs = ((a, s) for shp in shps for a, s in zip(read_dbf(str(shp)[:-4] + ".dbf"), read_shp_records(shp)))
+    for attrs, raw in pairs:
+        n += 1
+        if n % 2000 == 0:
+            log(f"  Shapefile: {n} Polygone gelesen, {len(polys_by)} Arten")
+        name = " ".join((attrs.get("sci_name") or attrs.get("binomial") or "").split()[:2])
+        try:
+            pres, orig = int(float(attrs.get("presence") or 1)), int(float(attrs.get("origin") or 1))
+        except ValueError:
+            continue
+        if not name or pres not in presence or orig not in origin or (only is not None and name not in only):
+            continue
+        for ring in parse_polygon(raw):
+            if len(ring) < 4 or ring_area(ring) >= 0:     # Loecher (gegen den Uhrzeigersinn) zaehlen nicht
+                continue
+            poly = Polygon(ring)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+            poly = poly.simplify(prep, preserve_topology=True)
+            if not poly.is_empty:
+                polys_by.setdefault(name, []).append(poly)
+    log(f"  {n} Polygone, {len(polys_by)} Arten mit Gebiet; verschmelze und vereinfache ...")
+    coarse, fine = {}, {}
+    for i, (name, polys) in enumerate(polys_by.items(), 1):
+        u = unary_union(polys)
+        if not u.is_valid:
+            u = u.buffer(0)
+        tiny = u.area < 0.05                               # kleine Inseln: feinere Toleranz und Raster
+        dg = digits + (1 if tiny else 0)
+        f = _shape_to_range(u.simplify(detail[0] / (10 if tiny else 1), preserve_topology=True), dg)
+        t = tol / (10 if tiny else 1)
+        while True:
+            c = _shape_to_range(u.simplify(t, preserve_topology=True), dg, min_area)
+            if c.count(";") + c.count("*") + 1 <= max_points or t > 2:
+                break
+            t *= 1.5
+        if c:
+            coarse[name] = c
+            fine[name] = f or c
+        if i % 1000 == 0:
+            log(f"  {i}/{len(polys_by)} Arten verschmolzen")
+    return coarse, fine
+
+
 def range_bucket(key, n=64):
     """Datei-Nummer fuer das feine Gebiet einer Art (djb2, identisch in index.html)."""
     h = 5381
@@ -1441,8 +1530,8 @@ def build_parser():
     rg.add_argument("--max-points", type=int, default=900, help="hoechstens so viele Punkte je Art")
     rg.add_argument("--min-area", type=float, default=0.002, help="kleinere Teilflaechen (Grad^2) weglassen, die groesste bleibt")
     rg.add_argument("--only-missing", default="", help="nur Arten, die in dieser ranges.json noch fehlen (ergaenzt sie)")
-    rg.add_argument("--detail-tolerance", type=float, default=0.015, help="feine Fassung zum Nachladen (0,015 = ca. 1,5 km)")
-    rg.add_argument("--detail-max-points", type=int, default=25000)
+    rg.add_argument("--detail-tolerance", type=float, default=0.01, help="feine Fassung zum Nachladen (0,01 = ca. 1 km)")
+    rg.add_argument("--detail-max-points", type=int, default=30000)
     rg.add_argument("--detail-out", default="crawl/ranges_detail.json")
     rg.add_argument("--out", default="crawl/ranges.json")
 
@@ -1539,8 +1628,15 @@ def main(argv=None, http=None):
             only = {" ".join((r.get("sci_name") or r.get("binomial") or "").split()[:2])
                     for shp in shps for r in read_dbf(str(shp)[:-4] + ".dbf")} - set(have)
             print(f"{len(only)} Arten ohne Gebiet in {a.only_missing}")
-        coarse, fine = iucn_ranges(shps, tol=a.tolerance, max_points=a.max_points, min_area=a.min_area, only=only,
-                                   detail=(a.detail_tolerance, a.detail_max_points))
+        try:
+            import shapely  # noqa: F401  (nur fuer diesen Schritt; .venv/bin/pip install shapely)
+            build = iucn_ranges_union
+        except ImportError:
+            print("Hinweis: ohne Shapely werden Teilflaechen nicht verschmolzen (Ueberlappungen bleiben). "
+                  "Besser: .venv/bin/python tools/crawler.py ranges ...")
+            build = iucn_ranges
+        coarse, fine = build(shps, tol=a.tolerance, max_points=a.max_points, min_area=a.min_area, only=only,
+                             detail=(a.detail_tolerance, a.detail_max_points))
         data = {**have, **coarse}
         have_fine = _load(a.detail_out) if a.only_missing and Path(a.detail_out).exists() else {}
         fine = {**have_fine, **fine}

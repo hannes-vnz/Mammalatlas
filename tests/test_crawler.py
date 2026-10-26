@@ -523,3 +523,33 @@ def test_grob_und_fein_aus_einem_lauf(tmp_path):
     write_shapefile(tmp_path / "W", [({"sci_name": "Vulpes vulpes", "presence": 1, "origin": 1}, [wavy])])
     coarse, fine = c.iucn_ranges([tmp_path / "W.shp"], log=lambda *a: None, detail=(0.005, 5000))
     assert len(fine["Vulpes vulpes"].split(";")) > len(coarse["Vulpes vulpes"].split(";")) >= 4
+
+
+def test_teilflaechen_werden_verschmolzen(tmp_path):
+    pytest.importorskip("shapely")
+    # zwei ueberlappende Quadrate (z. B. 'sicher' und 'wahrscheinlich vorkommend') plus eine getrennte Insel
+    write_shapefile(tmp_path / "U", [({"sci_name": "Sus scrofa", "presence": 1, "origin": 1}, [square(0, 0, 10)]),
+                                     ({"sci_name": "Sus scrofa", "presence": 2, "origin": 1}, [square(5, 5, 10)]),
+                                     ({"sci_name": "Sus scrofa", "presence": 1, "origin": 1}, [square(30, 30, 2)])])
+    coarse, fine = c.iucn_ranges_union([tmp_path / "U.shp"], log=lambda *a: None)
+    parts = fine["Sus scrofa"].split("*")
+    assert len(parts) == 2                                       # Ueberlappung zu einer Flaeche verschmolzen, Insel extra
+    assert len(parts[0].split(";")) == 9                          # L-Form: 8 Ecken + Schlusspunkt
+
+
+def test_gerundete_umrisse_bleiben_gueltig():
+    shapely = pytest.importorskip("shapely")
+    from shapely.geometry import Polygon
+    # schmale Bucht, die beim Runden auf 0,01 Grad sonst zur Selbstueberschneidung wird
+    poly = Polygon([(0, 0), (0, 1), (0.5, 1), (0.504, 0.2), (0.506, 0.2), (0.51, 1), (1, 1), (1, 0), (0, 0)])
+    out = c._shape_to_range(poly, 2)
+    for part in out.split("*"):
+        assert Polygon([tuple(map(float, p.split("|"))) for p in part.split(";")]).is_valid
+
+
+def test_ungueltige_flaeche_wird_repariert():
+    pytest.importorskip("shapely")
+    from shapely.geometry import Polygon
+    bowtie = Polygon([(0, 0), (2, 2), (2, 0), (0, 2), (0, 0)])        # Selbstueberschneidung
+    out = c._shape_to_range(bowtie, 2)
+    assert out and all(Polygon([tuple(map(float, p.split("|"))) for p in part.split(";")]).is_valid for part in out.split("*"))

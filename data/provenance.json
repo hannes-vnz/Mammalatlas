@@ -1274,7 +1274,7 @@
   "range": "iucn-polygons"
  },
  "Cavia_intermedia": {
-  "range": "gbif-hull (grobe Naeherung)"
+  "range": "iucn-polygons"
  },
  "Cavia_patzelti": {
   "range": "iucn-polygons"
@@ -1577,11 +1577,7 @@
   "range": "iucn-polygons"
  },
  "Fukomys_livingstoni": {
-  "img": {
-   "source": "wikidata",
-   "license": "CC BY 4.0",
-   "page": "https://commons.wikimedia.org/wiki/File:Holotype_Fukomys_livingstoni_Faulkes_2017.jpg"
-  }
+  "range": "iucn-polygons"
  },
  "Fukomys_micklemi": {
   "added": "2026-10-26",
@@ -7249,12 +7245,7 @@
   "source": "mdd"
  },
  "Eudiscoderma_thongareeae": {
-  "img": {
-   "source": "wikidata",
-   "license": "CC BY 4.0",
-   "page": "https://commons.wikimedia.org/wiki/File:Eudiscoderma_thongareeae_126952635.jpg"
-  },
-  "range": "gbif-hull (grobe Naeherung)"
+  "range": "iucn-polygons"
  },
  "Lyroderma_sinense": {
   "added": "2026-10-26",
@@ -23621,6 +23612,18 @@
   "range": "iucn-polygons"
  },
  "Zyzomys_pedunculatus": {
+  "range": "iucn-polygons"
+ },
+ "Murina_balaensis": {
+  "range": "iucn-polygons"
+ },
+ "Myotis_nimbaensis": {
+  "range": "iucn-polygons"
+ },
+ "Nyctophilus_nebulosus": {
+  "range": "iucn-polygons"
+ },
+ "Sicista_armenica": {
   "range": "iucn-polygons"
  }
 }

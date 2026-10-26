@@ -284,6 +284,13 @@ def _na(v):
     return "" if v in ("NA", "N/A") else v
 
 
+def _float(v):
+    try:
+        return float(_na(v))
+    except ValueError:
+        return None
+
+
 def find_mdd_files(folder="MDD"):
     """Neueste MDD-Artenliste und Synonymdatei im Ordner (Dateinamen wechseln je Version)."""
     def newest(pattern):
@@ -310,6 +317,8 @@ def load_mdd(path, only_orders=None, limit_per_order=None):
                         "status": m.group(1) if m else "", "statusConflict": False, "statusSource": "mdd",
                         "synonyms": [m.group(2).strip()] if m and m.group(2) else [],   # Name, unter dem IUCN die Art fuehrt
                         "extinct": _na(r.get("extinct")) == "1", "domestic": _na(r.get("domestic")) == "1",
+                        "countries": _na(r.get("countryDistribution")).replace("|", ", "),
+                        "typeLat": _float(r.get("typeLocalityLatitude")), "typeLng": _float(r.get("typeLocalityLongitude")),
                         "iucnId": None, "gbifId": None, "wikiTitle": None, "imageFile": None,
                         "massG": None, "lifespanYears": None, "source": "mdd"})
     return out
@@ -636,12 +645,16 @@ def hull_range(points, trim=0.05, min_points=5):
 
 
 def occurrence_summary(records):
+    records_all, records = records, [r for r in records if r["basis"] != "FOSSIL_SPECIMEN"]   # Fossilien zeigen Vorzeit-Verbreitung
     pts = [(r["lng"], r["lat"]) for r in records]
     living = [r for r in records if r["year"] and r["basis"] != "FOSSIL_SPECIMEN"]
-    return {"n": len(records), "range": hull_range(pts),
-            "lat": median_(sorted(r["lat"] for r in records)) if records else None,
-            "lng": median_(sorted(r["lng"] for r in records)) if records else None,
-            "lastYear": max((r["year"] for r in living), default=None)}
+    return {"n": len(records), "fossils": len(records_all) - len(records), "range": hull_range(pts),
+            # Lage fuer einen Marker: ohne Fossilien, sonst (nur Fossilfunde) aus allen Funden
+            "lat": median_(sorted(r["lat"] for r in records or records_all)) if records_all else None,
+            "lng": median_(sorted(r["lng"] for r in records or records_all)) if records_all else None,
+            "lastYear": max((r["year"] for r in living), default=None),
+            # Belegexemplare in Sammlungen; Beobachtungen koennen Zoo-Tiere, Fehlbestimmungen oder Namensverwechslungen sein
+            "lastSpecimenYear": max((r["year"] for r in living if r["basis"] == "PRESERVED_SPECIMEN"), default=None)}
 
 
 def median_(xs):
@@ -794,6 +807,18 @@ def slug(name):
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
+def fetch_extinction_years(http, qids):
+    """Aussterbejahr aus Wikidata (P8556 'extinction date'): {qid: jahr}."""
+    out = {}
+    for batch in chunks(sorted(qids), 150):
+        q = ("SELECT ?item (MIN(YEAR(?d)) AS ?y) WHERE { VALUES ?item { " + " ".join("wd:" + x for x in batch) + " } "
+             "?item wdt:P8556 ?d . } GROUP BY ?item")
+        for b in sparql(http, q):
+            if bval(b, "y"):
+                out[qid_of(bval(b, "item"))] = int(float(bval(b, "y")))
+    return out
+
+
 def build_extinct(http, taxa, category=None, overrides=None, gbif_max=150, depth=1, log=print):
     overrides = overrides or {}
     cands = {s.get("qid") or s["sciName"]: dict(s, source=("mdd" if s.get("source") == "mdd" else "wikidata-iucn"))
@@ -803,14 +828,24 @@ def build_extinct(http, taxa, category=None, overrides=None, gbif_max=150, depth
             s["iucnStatus"], s["status"] = s.get("status", ""), "EX"
     if category:
         qids = titles_to_qids(http, category_titles(http, category, depth))
+        known = {name_key(s["sciName"]) for s in cands.values()}
         extra = [q for q in qids if q not in cands]
         log(f"  Kategorie '{category}': {len(qids)} Seiten, {len(extra)} neue Kandidaten")
         for s in fetch_items(http, extra):
+            if name_key(s["sciName"]) in known:      # schon ueber MDD dabei (ohne Wikidata-Treffer)
+                continue
+            if s["status"] not in ("", "EX", "EW"):  # Kategorie enthaelt auch Arten, die nur regional ausgestorben sind
+                continue
             s["status"] = s["status"] or "EX"
             cands[s["qid"]] = dict(s, source="wikipedia-category")
     species = list(cands.values())
     enrich(http, species, log)
     places = fetch_places(http, [s["qid"] for s in species if s.get("qid")])
+    wd_years = fetch_extinction_years(http, [s["qid"] for s in species if s.get("qid")])
+    before = len(species)
+    species = [s for s in species if wd_years.get(s.get("qid"), 1500) >= 1500]   # vorgeschichtlich ausgestorben: nicht Teil des Atlas
+    if len(species) < before:
+        log(f"  {before - len(species)} Arten vor 1500 ausgestorben (laut Wikidata), ausgelassen")
     gb = crawl_gbif(http, [s["sciName"] for s in species], gbif_max, 300, log,
                     keys={s["sciName"]: s.get("gbifId") for s in species})
     out = []
@@ -821,23 +856,48 @@ def build_extinct(http, taxa, category=None, overrides=None, gbif_max=150, depth
         year, approx, ysrc = None, False, ""
         if "year" in ov:
             year, approx, ysrc = int(ov["year"]), bool(ov.get("yearApprox")), "override"
+        elif wd_years.get(s.get("qid")):
+            year, ysrc = wd_years[s["qid"]], "wikidata"
         elif hint:
             year, approx, ysrc = hint[0], hint[1], "wikipedia-text"
-        elif g.get("lastYear"):
-            year, ysrc = int(g["lastYear"]), "gbif-last-record"
-        lat = ov.get("lat", place.get("lat", g.get("lat")))
-        lng = ov.get("lng", place.get("lng", g.get("lng")))
+        # GBIF-Jahre werden bewusst nicht genutzt: auch Belegexemplare tragen oft Katalog- statt Fundjahre (geprueft 2026-10)
+        lat = next((v for v in (ov.get("lat"), place.get("lat"), g.get("lat"), s.get("typeLat")) if v is not None), None)
+        lng = next((v for v in (ov.get("lng"), place.get("lng"), g.get("lng"), s.get("typeLng")) if v is not None), None)
         out.append({
             "id": slug(s["sciName"]), "sciName": s["sciName"], "common": s["common"], "order": s.get("order", ""),
+            "rank": "subspecies" if len(s["sciName"].split()) > 2 else "species",
             "family": s.get("family", ""), "status": s["status"], "year": year, "yearApprox": approx, "yearSource": ysrc,
-            "causes": ov.get("causes", cause_hints(s.get("summary", ""))), "region": ov.get("region", place.get("label", "")),
-            "lat": lat, "lng": lng, "range": g.get("range") or "", "rangeQuality": "low" if g.get("range") else "",
+            "causes": ov.get("causes", cause_hints(s.get("summary", ""))), "region": ov.get("region", place.get("label") or s.get("countries", "")),
+            # keine GBIF-Huelle: Funde ausgestorbener Arten sind meist Knochen und alte Belege, oft nicht als Fossil
+            # markiert; die Huelle zeigte z. B. beim Beutelwolf halb Australien (geprueft 2026-10)
+            "lat": lat, "lng": lng, "range": "", "rangeQuality": "",
             "img": s.get("img", ""), "imgLicense": s.get("imgLicense", ""), "imgArtist": s.get("imgArtist", ""),
             "imgPage": s.get("imgPage", ""), "summary": ov.get("summary", s.get("summary", "")),
             "wikipedia": "https://en.wikipedia.org/wiki/" + urllib.parse.quote((s.get("wikiTitle") or s["sciName"]).replace(" ", "_")),
-            "source": s["source"], "verified": bool(ov), **({"iucnStatus": s["iucnStatus"]} if s.get("iucnStatus") else {})})
+            "source": s["source"], "verified": bool(ov), "synonyms": s.get("synonyms") or [], **({"iucnStatus": s["iucnStatus"]} if s.get("iucnStatus") else {})})
     out.sort(key=lambda r: (r["year"] is None, r["year"] or 0))
     return out
+
+
+def keep_curated(out, existing):
+    """Handgepflegte Eintraege (source 'seed...' oder verified) aus dem bisherigen Datensatz behalten.
+    Sie ersetzen den Crawler-Eintrag; leere Felder werden aus dem Crawler ergaenzt. Rueckgabe: Anzahl behaltener."""
+    by = {}
+    for i, r in enumerate(out):
+        for n in [r["sciName"]] + list(r.get("synonyms") or []):   # Handpflege nutzt teils aeltere Namen
+            by.setdefault(name_key(n), i)
+    kept = 0
+    for r in existing:
+        if not (str(r.get("source", "")).startswith("seed") or r.get("verified")):
+            continue
+        i = by.get(name_key(r.get("sciName", "")))
+        if i is None:
+            out.append(r)
+        else:
+            out[i] = {**out[i], **{k: v for k, v in r.items() if v not in (None, "", [])}}
+        kept += 1
+    out.sort(key=lambda r: (r.get("year") is None, r.get("year") or 0))
+    return kept
 
 
 # --------------------------------------------------------------------------- Zusammenfuehren
@@ -1031,6 +1091,7 @@ def build_parser():
     x.add_argument("--overrides", default="data/extinct_overrides.json", help="eigene Korrekturen je Art (Jahr, Ort, Ursache ...)")
     x.add_argument("--gbif-max", type=int, default=150)
     x.add_argument("--out", default="crawl/extinct_species.json", help="erst pruefen, dann nach data/ kopieren")
+    x.add_argument("--keep", default="data/extinct_species.json", help="handgepflegte Eintraege daraus uebernehmen ('' = keine)")
 
     m = sub.add_parser("merge", help="in species_part_*.txt zusammenfuehren (ohne --apply nur Vorschau)")
     m.add_argument("--data", default="data"); m.add_argument("--taxa", default="crawl/taxa.json")
@@ -1092,6 +1153,9 @@ def main(argv=None, http=None):
     elif a.cmd == "extinct":
         ov = _load(a.overrides) if Path(a.overrides).exists() else {}
         data = build_extinct(http, _load(a.taxa), a.category or None, ov, a.gbif_max, a.depth)
+        if a.keep and Path(a.keep).exists():
+            print(f"{keep_curated(data, _load(a.keep).get('species', []))} handgepflegte Eintraege aus {a.keep} behalten")
+        print(f"{sum(1 for r in data if r.get('lat') is not None)} von {len(data)} Arten mit Koordinaten (nur diese erscheinen auf der Karte)")
         _save(a.out, {"meta": {"generated": date.today().isoformat(), "count": len(data), "crawler": VERSION,
                                "note": "Jahre, Orte und Ursachen sind Heuristiken. Korrekturen in extinct_overrides.json."},
                       "species": data})

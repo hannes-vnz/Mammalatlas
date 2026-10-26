@@ -37,7 +37,7 @@ Put the MDD download in `MDD/` (ignored by git, the synonym file alone is 68 MB)
 - IUCN status from Wikidata is applied only with `--update-status`, and every change is listed in the report. Wikidata can lag behind the Red List, so check the list.
 - **New species** are added only when they have a status (`NE` = not evaluated counts). Species marked extinct go to the extinct dataset instead of the living atlas, domestic forms are skipped. Species that MDD lists as extinct but the atlas shows as living are reported, not changed.
 - Ranges built from GBIF points are a **rough approximation** (trimmed convex hull of up to 300 records, biased towards well-sampled regions). They are flagged as `gbif-hull` in `data/provenance.json` and the species profile says so. They are no substitute for expert range maps.
-- Extinction years and causes in the extinct dataset are **heuristics** from the Wikipedia text and GBIF. Correct them in `data/extinct_overrides.json`, for example:
+- Extinction years in the extinct dataset come from Wikidata (P8556) or, failing that, a **heuristic** on the Wikipedia text; causes are text heuristics too. GBIF is used only for an approximate marker position, not for years or range outlines (records of extinct species are mostly old specimens and bones with catalogue dates). Species that Wikidata dates before 1500 are left out. Hand-curated entries (`source: seed…` or `verified`) in the existing file are kept. Correct them in `data/extinct_overrides.json`, for example:
 
 ```json
 { "Thylacinus cynocephalus": { "year": 1936, "lat": -42.0, "lng": 146.5, "region": "Tasmania", "causes": ["Jagd"] } }
@@ -49,4 +49,4 @@ Wikipedia text is CC BY-SA, images carry the licence stored per species, GBIF re
 
 ## Tests
 
-`pytest tests/test_crawler.py` runs offline against mocked API answers (22 tests). The crawler has not been run against the live services in this repository's build environment, so do a small first run and check the output before a full crawl.
+`pytest tests/test_crawler.py` runs offline against mocked API answers (24 tests). The crawler has not been run against the live services in this repository's build environment, so do a small first run and check the output before a full crawl.

@@ -124,7 +124,8 @@ def test_gbif_letztes_jahr_ohne_fossilien():
                      {"decimalLatitude": -30.0, "decimalLongitude": 140.0, "year": 2001, "basisOfRecord": "FOSSIL_SPECIMEN"},
                      {"decimalLatitude": None, "decimalLongitude": None}]})])
     out = c.crawl_gbif(http, ["Thylacinus cynocephalus"], log=lambda *a: None)["Thylacinus cynocephalus"]
-    assert out["lastYear"] == 1936 and out["n"] == 3 and out["gbifKey"] == 42 and out["range"] is None   # <5 Punkte
+    assert out["lastYear"] == 1936 and out["n"] == 2 and out["fossils"] == 1 and out["gbifKey"] == 42 and out["range"] is None   # <5 Punkte
+    assert out["lastSpecimenYear"] == 1936
 
 
 # ------------------------------------------------------------------ Hinweise aus dem Text
@@ -205,6 +206,7 @@ def test_ausgestorbenen_datensatz_aufbauen(tmp_path):
         (lambda u, p: u == c.COMMONS_API, {"query": {"pages": [{"title": "File:Thylacine.jpg", "imageinfo": [{"extmetadata": {
             "LicenseShortName": {"value": "Public domain"}, "Artist": {"value": "Baker"}}}]}]}}),
         (sparql_has("wdt:P183"), sparql_result([B(item=Q + "Q30", place=Q + "Q40", placeLabel="Tasmania", coord="Point(146.5 -42.0)")])),
+        (sparql_has("wdt:P8556"), sparql_result([B(item=Q + "Q31", y="1883")])),
         (lambda u, p: u.endswith("/species/match"), {"matchType": "NONE"}),
     ])
     taxa = [{"qid": "Q30", "sciName": "Thylacinus cynocephalus", "common": "Thylacine", "status": "EX", "wikiTitle": "Thylacine", "order": "DASYUROMORPHIA", "family": "THYLACINIDAE"},
@@ -216,7 +218,7 @@ def test_ausgestorbenen_datensatz_aufbauen(tmp_path):
     t, q = by["thylacinus_cynocephalus"], by["equus_quagga_quagga"]
     assert t["year"] == 1936 and t["yearSource"] == "wikipedia-text" and t["region"] == "Tasmania" and (t["lat"], t["lng"]) == (-42.0, 146.5)
     assert t["img"] == "https://img/thyl.jpg" and t["imgLicense"] == "Public domain" and {"Jagd", "Lebensraumverlust"} <= set(t["causes"])
-    assert q["year"] == 1883 and q["lat"] == -32.0 and q["region"] == "Suedafrika" and q["verified"] and q["source"] == "wikipedia-category"
+    assert q["year"] == 1883 and q["yearSource"] == "wikidata" and q["lat"] == -32.0 and q["region"] == "Suedafrika" and q["verified"] and q["source"] == "wikipedia-category"
     assert [r["year"] for r in out] == [1883, 1936]                              # nach Jahr sortiert
 
 
@@ -359,3 +361,29 @@ def test_karte_als_titelbild_wird_durch_wikidata_bild_ersetzt():
     assert sp[0]["img"] == "https://upload/250px-Kunsi_photo.jpg" and sp[0]["imgSource"] == "wikidata" and sp[0]["summary"] == "Ein Opossum."
     assert sp[1]["img"] == "https://upload/thumb/Fuchs.jpg" and sp[1]["imgSource"] == "wikipedia" and sp[1]["imgLicense"] == "CC BY 4.0"
     assert "img" not in sp[2]                                              # Karte aus Wikidata wird auch nicht genommen
+
+
+def test_handgepflegte_ausgestorbene_bleiben():
+    out = [{"sciName": "Bos primigenius", "common": "Aurochs", "year": 1700, "img": "https://x/a.jpg", "summary": "Text"},
+           {"sciName": "Hydrodamalis gigas", "common": "Steller's sea cow", "year": 1768}]
+    seed = [{"sciName": "Bos primigenius", "common": "Auerochse", "year": 1627, "img": "", "source": "seed"},
+            {"sciName": "Equus ferus ferus", "common": "Tarpan", "year": 1909, "source": "seed"},
+            {"sciName": "Foo bar", "year": 1, "source": "wikidata-iucn"}]
+    assert c.keep_curated(out, seed) == 2
+    by = {r["sciName"]: r for r in out}
+    assert by["Bos primigenius"]["common"] == "Auerochse" and by["Bos primigenius"]["year"] == 1627
+    assert by["Bos primigenius"]["img"] == "https://x/a.jpg" and by["Bos primigenius"]["summary"] == "Text"
+    assert "Equus ferus ferus" in by and "Foo bar" not in by and [r["year"] for r in out] == [1627, 1768, 1909]
+
+
+def test_vorgeschichtlich_ausgestorbene_fallen_raus():
+    Q = "http://www.wikidata.org/entity/"
+    http = Fake([(sparql_has("wdt:P183"), sparql_result([])),
+                 (sparql_has("wdt:P8556"), sparql_result([B(item=Q + "Q50", y="1350")])),
+                 (lambda u, p: u.endswith("/species/match"), {"matchType": "NONE"})])
+    taxa = [{"qid": "Q50", "sciName": "Megaladapis edwardsi", "common": "M", "status": "", "extinct": True, "source": "mdd"},
+            {"qid": None, "sciName": "Pipistrellus murrayi", "common": "Christmas Island pipistrelle", "status": "EX", "source": "mdd",
+             "typeLat": -10.5, "typeLng": 105.6, "countries": "Australia"}]
+    out = c.build_extinct(http, taxa, None, log=lambda *a: None)
+    assert [r["sciName"] for r in out] == ["Pipistrellus murrayi"]
+    assert (out[0]["lat"], out[0]["lng"], out[0]["region"]) == (-10.5, 105.6, "Australia")

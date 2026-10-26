@@ -13,11 +13,12 @@ ergaenzen und einen Datensatz ausgestorbener Arten aufzubauen:
 
 Schritte (jeder schreibt eine JSON-Datei, alle sind wiederaufnehmbar dank Cache):
 
-  taxa      Arten aus Wikidata                    -> crawl/taxa.json
+  mdd       vollstaendige Artenliste aus MDD (lokale CSV) + Wikidata-IDs -> crawl/taxa.json
+  taxa      Arten aus Wikidata (Alternative zu mdd) -> crawl/taxa.json
   enrich    Bilder, Lizenzen, Texte               -> crawl/taxa.json (ergaenzt)
   traits    Masse/Lebensdauer aus lokalen Tabellen -> crawl/taxa.json (ergaenzt)
   gbif      Gebietsnaeherung fuer Arten ohne Polygon -> crawl/gbif.json
-  extinct   Datensatz ausgestorbener Arten         -> data/extinct_species.json
+  extinct   Datensatz ausgestorbener Arten         -> crawl/extinct_species.json (pruefen, dann nach data/)
   merge     fuehrt alles in species_part_*.txt zusammen (Standard: nur Vorschau, --apply schreibt)
 
 Hoeflichkeit: Wikimedia und GBIF verlangen einen aussagekraeftigen User-Agent mit Kontakt.
@@ -29,7 +30,9 @@ CC0/CC BY je Datensatz. Die Verbreitungsgebiete aus GBIF sind grobe Naeherungen 
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
+import html
 import json
 import math
 import re
@@ -93,12 +96,15 @@ class Http:
                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                 self.requests_made += 1
+                err = data.get("error") if isinstance(data, dict) else None
+                if isinstance(err, dict):              # MediaWiki meldet Fehler mit HTTP 200; nicht cachen
+                    raise CrawlError(f"API-Fehler {err.get('code')}: {err.get('info', '')[:120]} fuer {full[:140]}")
                 self.cache.mkdir(parents=True, exist_ok=True)
                 key.write_text(json.dumps(data), encoding="utf-8")
                 return data
             except urllib.error.HTTPError as e:
                 if e.code in (429, 500, 502, 503, 504) and attempt < self.retries:
-                    wait = int(e.headers.get("Retry-After", 0) or 0) or 2 ** (attempt + 1) * 2
+                    wait = _retry_after(e.headers.get("Retry-After")) or 2 ** (attempt + 1) * 2
                     print(f"  HTTP {e.code}, warte {wait}s ...", file=sys.stderr)
                     time.sleep(wait)
                     continue
@@ -109,6 +115,21 @@ class Http:
                     continue
                 raise CrawlError(f"{type(e).__name__} fuer {full[:140]}: {e}") from e
         raise CrawlError("unerreichbar")
+
+
+def _retry_after(value):
+    """Retry-After als Sekunden oder HTTP-Datum; None, wenn unbrauchbar. Hoechstens 5 Minuten."""
+    if not value:
+        return None
+    try:
+        return min(300, max(1, int(value)))
+    except ValueError:
+        pass
+    try:
+        from email.utils import parsedate_to_datetime
+        return min(300, max(1, int(parsedate_to_datetime(value).timestamp() - time.time())))
+    except (TypeError, ValueError):
+        return None
 
 
 # --------------------------------------------------------------------------- Hilfen
@@ -180,7 +201,7 @@ SELECT ?item ?name ?label ?status ?statusLabel ?iucn ?gbif ?image ?mass ?life ?f
   OPTIONAL {{ ?item wdt:P627 ?iucn . }}
   OPTIONAL {{ ?item wdt:P846 ?gbif . }}
   OPTIONAL {{ ?item wdt:P18 ?image . }}
-  OPTIONAL {{ ?item p:P2067/psn:P2067/wikibase:quantityAmount ?mass . }}
+  OPTIONAL {{ ?item p:P2067 ?ms . ?ms psn:P2067/wikibase:quantityAmount ?mass . FILTER NOT EXISTS {{ ?ms pq:P518|pq:P642 ?part }} }}
   OPTIONAL {{ ?item p:P2250/psn:P2250/wikibase:quantityAmount ?life . }}
   OPTIONAL {{ ?item wdt:P171+ ?fam . ?fam wdt:P105 wd:{family} ; wdt:P225 ?famName . }}
   OPTIONAL {{ ?art schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> ; schema:name ?title . }}
@@ -216,6 +237,8 @@ def collapse_rows(rows, order_name):
         sts = sorted(it.pop("statuses"), key=lambda s: -SEVERITY.get(s, 0))
         label, images = it.pop("label"), it.pop("images")
         mass, life = it.pop("massKg"), it.pop("lifespanSeconds")
+        if label and re.fullmatch(r"Q\d+", label):     # Label-Service liefert die QID, wenn kein englisches Label existiert
+            label = None
         common = label if label and label.lower() != it["sciName"].lower() else (it["wikiTitle"] or "")
         if common.lower() == it["sciName"].lower():
             common = ""
@@ -230,7 +253,7 @@ def collapse_rows(rows, order_name):
 def crawl_taxa(http, only_orders=None, limit_per_order=None, page=1500, rank=Q_SPECIES, log=print):
     orders = fetch_orders(http, only_orders)
     log(f"{len(orders)} Ordnungen")
-    result = []
+    result, seen = [], set()
     for oq, oname in sorted(orders.items(), key=lambda kv: kv[1]):
         offset, got = 0, []
         while True:
@@ -245,8 +268,129 @@ def crawl_taxa(http, only_orders=None, limit_per_order=None, page=1500, rank=Q_S
             offset += lim
         if got:
             log(f"  {oname}: {len(got)} Arten")
-        result.extend(got)
+        for s in got:      # Wikidata fuehrt auch veraltete Ordnungen (z. B. Cetartiodactyla): Arten nur einmal
+            if s["qid"] not in seen:
+                seen.add(s["qid"])
+                result.append(s)
     return result
+
+
+# --------------------------------------------------------------------------- MDD: vollstaendige Artenliste
+MDD_STATUS = re.compile(r"^\s*(LC|NT|VU|EN|CR|EW|EX|DD|NE)\b(?:\s*\(as ([^)]+)\))?")
+
+
+def _na(v):
+    v = (v or "").strip()
+    return "" if v in ("NA", "N/A") else v
+
+
+def find_mdd_files(folder="MDD"):
+    """Neueste MDD-Artenliste und Synonymdatei im Ordner (Dateinamen wechseln je Version)."""
+    def newest(pattern):
+        files = sorted(Path(folder).glob(pattern), key=lambda p: [int(x) for x in re.findall(r"\d+", p.name)[:2]])
+        return files[-1] if files else None
+    return newest("MDD_v*_*species.csv"), newest("Species_Syn*_v*.csv")
+
+
+def load_mdd(path, only_orders=None, limit_per_order=None):
+    """MDD-CSV -> Datensaetze im Format von crawl/taxa.json (ohne Wikidata-Felder)."""
+    wanted = {o.strip().lower() for o in only_orders or []}
+    out, per_order = [], {}
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        for r in csv.DictReader(f):
+            name, order = _na(r.get("sciName")).replace("_", " "), _na(r.get("order"))
+            if not name or (wanted and order.lower() not in wanted):
+                continue
+            if limit_per_order and per_order.get(order, 0) >= limit_per_order:
+                continue
+            per_order[order] = per_order.get(order, 0) + 1
+            m = MDD_STATUS.match(r.get("iucnStatus") or "")
+            out.append({"qid": None, "mddId": _na(r.get("id")), "sciName": name, "common": _na(r.get("mainCommonName")) or name,
+                        "order": order.upper(), "family": _na(r.get("family")).upper(),
+                        "status": m.group(1) if m else "", "statusConflict": False, "statusSource": "mdd",
+                        "synonyms": [m.group(2).strip()] if m and m.group(2) else [],   # Name, unter dem IUCN die Art fuehrt
+                        "extinct": _na(r.get("extinct")) == "1", "domestic": _na(r.get("domestic")) == "1",
+                        "iucnId": None, "gbifId": None, "wikiTitle": None, "imageFile": None,
+                        "massG": None, "lifespanYears": None, "source": "mdd"})
+    return out
+
+
+def link_synonyms(taxa, syn_path, names):
+    """Ordnet Namen (z. B. aus dem Atlas), die MDD nicht als Art fuehrt, ueber die MDD-Synonymliste einer Art zu.
+    Nur eindeutige Treffer auf Namen im Artrang. Rueckgabe: Anzahl zugeordneter Namen."""
+    by_name = {name_key(s["sciName"]): s for s in taxa}
+    known = set(by_name) | {name_key(a) for s in taxa for a in s["synonyms"]}
+    todo = {name_key(n): n for n in names if name_key(n) not in known}
+    if not todo or not syn_path:
+        return 0
+    hits = {}
+    with open(syn_path, encoding="utf-8-sig", newline="") as f:
+        for r in csv.DictReader(f):
+            if _na(r.get("MDD_original_rank")) not in ("", "species"):
+                continue
+            target = name_key(_na(r.get("MDD_species")))
+            for col in ("MDD_original_combination", "MDD_normalized_original_combination"):
+                k = name_key(_na(r.get(col)))
+                if k in todo and target in by_name:
+                    hits.setdefault(k, set()).add(target)
+    linked = 0
+    for k, targets in hits.items():
+        if len(targets) == 1:
+            by_name[next(iter(targets))]["synonyms"].append(todo[k].replace("_", " "))
+            linked += 1
+    return linked
+
+
+NAME_QUERY = """
+SELECT ?item ?name ?label ?status ?statusLabel ?iucn ?gbif ?image ?mass ?life ?title WHERE {{
+  VALUES ?name {{ {values} }}
+  ?item wdt:P225 ?name ; wdt:P105 wd:{sp} .
+  ?item wdt:P171+ ?anc . FILTER(?anc = wd:{mammalia})   # Pfad vom Item aus aufwaerts, nicht von Mammalia abwaerts
+  OPTIONAL {{ ?item wdt:P141 ?status . }}
+  OPTIONAL {{ ?item wdt:P627 ?iucn . }}
+  OPTIONAL {{ ?item wdt:P846 ?gbif . }}
+  OPTIONAL {{ ?item wdt:P18 ?image . }}
+  OPTIONAL {{ ?item p:P2067 ?ms . ?ms psn:P2067/wikibase:quantityAmount ?mass . FILTER NOT EXISTS {{ ?ms pq:P518|pq:P642 ?part }} }}
+  OPTIONAL {{ ?item p:P2250/psn:P2250/wikibase:quantityAmount ?life . }}
+  OPTIONAL {{ ?art schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> ; schema:name ?title . }}
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en" . ?item rdfs:label ?label . ?status rdfs:label ?statusLabel . }}
+}}
+"""
+
+
+def wikidata_by_names(http, names, batch=60):
+    """{Name (klein): Wikidata-Datensatz} fuer wissenschaftliche Namen; bei mehreren Items das mit den meisten Angaben."""
+    out = {}
+    for part in chunks(sorted({n.replace("_", " ") for n in names}), batch):
+        rows = sparql(http, NAME_QUERY.format(values=" ".join(json.dumps(n, ensure_ascii=False) for n in part), sp=Q_SPECIES, mammalia=Q_MAMMALIA))
+        for s in collapse_rows(rows, ""):
+            score = (bool(s["wikiTitle"]), bool(s["iucnId"]), bool(s["imageFile"]))
+            k = name_key(s["sciName"])
+            if k not in out or score > out[k][0]:
+                out[k] = (score, s)
+    return {k: v[1] for k, v in out.items()}
+
+
+def attach_wikidata(http, taxa, log=print):
+    """Ergaenzt MDD-Datensaetze um QID, Wikipedia-Titel, Bilddatei, IUCN-/GBIF-ID, Masse und Lebensdauer."""
+    wd = wikidata_by_names(http, [n for s in taxa for n in [s["sciName"]] + s["synonyms"]])
+    used, found = set(), 0
+    for pass_synonyms in (False, True):   # erst exakte Namen, dann Synonyme, damit kein Item doppelt vergeben wird
+        for s in taxa:
+            if s.get("qid"):
+                continue
+            names = s["synonyms"] if pass_synonyms else [s["sciName"]]
+            w = next((wd[name_key(n)] for n in names if name_key(n) in wd and wd[name_key(n)]["qid"] not in used), None)
+            if not w:
+                continue
+            used.add(w["qid"])
+            found += 1
+            for k in ("qid", "wikiTitle", "imageFile", "iucnId", "gbifId", "massG", "lifespanYears"):
+                if s.get(k) is None:
+                    s[k] = w[k]
+            s["wdStatus"] = w["status"]
+    log(f"  Wikidata: {found} von {len(taxa)} Arten gefunden")
+    return taxa
 
 
 # --------------------------------------------------------------------------- Wikipedia und Commons
@@ -260,18 +404,27 @@ def _shorten(text, limit=600):
 
 
 def _strip_html(s):
-    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", s or "")).strip()
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", s or ""))).strip()
 
 
 def wikipedia_pages(http, titles):
     """Titelbild (nur freie Lizenzen) und Einleitung fuer bis zu 20 Titel. Rueckgabe: {qid: Daten}."""
-    data = http.get_json(WIKIPEDIA_API, {
+    params = {
         "action": "query", "format": "json", "formatversion": "2", "redirects": "1",
         "titles": "|".join(titles), "prop": "pageimages|extracts|pageprops",
         "piprop": "thumbnail|name", "pithumbsize": "250", "pilicense": "free",
-        "exintro": "1", "explaintext": "1", "exlimit": "20", "ppprop": "wikibase_item"})
+        "exintro": "1", "explaintext": "1", "exlimit": "20", "ppprop": "wikibase_item"}
+    pages = {}
+    for _ in range(10):        # TextExtracts liefert lange Einleitungen teils erst ueber 'continue'
+        data = http.get_json(WIKIPEDIA_API, params)
+        for page in data.get("query", {}).get("pages", []):
+            merged = pages.setdefault(page.get("title"), {})
+            merged.update({k: v for k, v in page.items() if v not in (None, "")})
+        if not data.get("continue"):
+            break
+        params = {**params, **data["continue"]}
     out = {}
-    for page in data.get("query", {}).get("pages", []):
+    for page in pages.values():
         if page.get("missing"):
             continue
         q = (page.get("pageprops") or {}).get("wikibase_item")
@@ -331,7 +484,6 @@ def read_table(path):
     text = Path(path).read_text(encoding="utf-8-sig", errors="replace")
     lines = [l for l in text.splitlines() if l.strip()]
     delim = "\t" if lines[0].count("\t") >= lines[0].count(",") else ","
-    import csv
     return list(csv.DictReader(lines, delimiter=delim))
 
 
@@ -378,13 +530,15 @@ def apply_traits(species, tables):
     """tables: [(quelle, {name: werte}), ...] in Prioritaetsreihenfolge; fuellt nur fehlende Werte."""
     filled = 0
     for s in species:
-        key = s["sciName"].lower()
+        keys = [name_key(n) for n in [s["sciName"]] + list(s.get("synonyms") or [])]
         for src, table in tables:
-            t = table.get(key)
+            t = next((table[k] for k in keys if k in table), None)
             if not t:
                 continue
             for field in ("massG", "lifespanYears"):
-                if not s.get(field) and t.get(field):
+                # Wikidata-P2250 ist Lebenserwartung, die Tabellen nennen Hoechstlebensdauer: Tabellenwert hat Vorrang
+                replace = field == "lifespanYears" and field not in (s.get("traitSource") or {})
+                if (not s.get(field) or replace) and t.get(field):
                     s[field] = t[field]
                     s.setdefault("traitSource", {})[field] = src
                     filled += 1
@@ -393,8 +547,11 @@ def apply_traits(species, tables):
 
 # --------------------------------------------------------------------------- GBIF
 def gbif_key(http, sci_name):
+    """GBIF-Schluessel des anerkannten Taxons (bei Synonymen acceptedUsageKey), nur exakte Treffer auf Art/Unterart."""
     r = http.get_json(f"{GBIF_API}/species/match", {"name": sci_name, "kingdom": "Animalia", "class": "Mammalia", "strict": "true"})
-    return r.get("usageKey") if r.get("matchType") == "EXACT" and r.get("rank") == "SPECIES" else None
+    if r.get("matchType") != "EXACT" or r.get("rank") not in ("SPECIES", "SUBSPECIES"):
+        return None
+    return r.get("acceptedUsageKey") or r.get("usageKey")
 
 
 def gbif_occurrences(http, key, max_records=300):
@@ -465,11 +622,12 @@ def median_(xs):
     return xs[m] if len(xs) % 2 else (xs[m - 1] + xs[m]) / 2
 
 
-def crawl_gbif(http, names, max_species=200, max_records=300, log=print):
-    out = {}
+def crawl_gbif(http, names, max_species=200, max_records=300, log=print, keys=None):
+    """keys: optional {Name: GBIF-ID aus Wikidata (P846)}; erspart den Namensabgleich."""
+    out, keys = {}, keys or {}
     for i, name in enumerate(names[:max_species], 1):
         try:
-            key = gbif_key(http, name)
+            key = int(keys[name]) if str(keys.get(name) or "").isdigit() else gbif_key(http, name)
             if not key:
                 continue
             summary = occurrence_summary(gbif_occurrences(http, key, max_records))
@@ -559,12 +717,12 @@ ITEM_QUERY = """
 SELECT ?item ?name ?label ?status ?statusLabel ?iucn ?gbif ?image ?mass ?life ?famName ?orderName ?title WHERE {{
   VALUES ?item {{ {values} }}
   ?item wdt:P105 ?rank . FILTER(?rank IN (wd:{sp}, wd:{ssp}))
-  ?item wdt:P171+ wd:{mammalia} ; wdt:P225 ?name .
+  ?item wdt:P225 ?name . ?item wdt:P171+ ?anc . FILTER(?anc = wd:{mammalia})
   OPTIONAL {{ ?item wdt:P141 ?status . }}
   OPTIONAL {{ ?item wdt:P627 ?iucn . }}
   OPTIONAL {{ ?item wdt:P846 ?gbif . }}
   OPTIONAL {{ ?item wdt:P18 ?image . }}
-  OPTIONAL {{ ?item p:P2067/psn:P2067/wikibase:quantityAmount ?mass . }}
+  OPTIONAL {{ ?item p:P2067 ?ms . ?ms psn:P2067/wikibase:quantityAmount ?mass . FILTER NOT EXISTS {{ ?ms pq:P518|pq:P642 ?part }} }}
   OPTIONAL {{ ?item p:P2250/psn:P2250/wikibase:quantityAmount ?life . }}
   OPTIONAL {{ ?item wdt:P171+ ?fam . ?fam wdt:P105 wd:{family} ; wdt:P225 ?famName . }}
   OPTIONAL {{ ?item wdt:P171+ ?ord . ?ord wdt:P105 wd:{order} ; wdt:P225 ?orderName . }}
@@ -576,16 +734,17 @@ SELECT ?item ?name ?label ?status ?statusLabel ?iucn ?gbif ?image ?mass ?life ?f
 
 def fetch_items(http, qids):
     """Details zu bekannten Wikidata-Items (Art oder Unterart, Saeugetier)."""
-    out = []
+    out = {}
     for batch in chunks(sorted(qids), 80):
         rows = sparql(http, ITEM_QUERY.format(values=" ".join("wd:" + q for q in batch), sp=Q_SPECIES, ssp=Q_SUBSPECIES,
                                               mammalia=Q_MAMMALIA, family=Q_FAMILY, order=Q_ORDER))
         by_order = {}
         for b in rows:
             by_order.setdefault(bval(b, "orderName") or "", []).append(b)
-        for oname, part in by_order.items():
-            out.extend(collapse_rows(part, oname))
-    return out
+        for oname, part in sorted(by_order.items(), key=lambda kv: (not kv[0], kv[0])):   # mehrere Ordnungen je Art: erste benannte behalten
+            for s in collapse_rows(part, oname):
+                out.setdefault(s["qid"], s)
+    return list(out.values())
 
 
 def fetch_places(http, qids):
@@ -609,7 +768,11 @@ def slug(name):
 
 def build_extinct(http, taxa, category=None, overrides=None, gbif_max=150, depth=1, log=print):
     overrides = overrides or {}
-    cands = {s["qid"]: dict(s, source="wikidata-iucn") for s in taxa if s.get("status") in ("EX", "EW")}
+    cands = {s.get("qid") or s["sciName"]: dict(s, source=("mdd" if s.get("source") == "mdd" else "wikidata-iucn"))
+             for s in taxa if s.get("status") in ("EX", "EW") or s.get("extinct")}
+    for s in cands.values():
+        if s.get("status") not in ("EX", "EW"):   # z. B. MDD 'ausgestorben', IUCN noch CR
+            s["iucnStatus"], s["status"] = s.get("status", ""), "EX"
     if category:
         qids = titles_to_qids(http, category_titles(http, category, depth))
         extra = [q for q in qids if q not in cands]
@@ -619,12 +782,13 @@ def build_extinct(http, taxa, category=None, overrides=None, gbif_max=150, depth
             cands[s["qid"]] = dict(s, source="wikipedia-category")
     species = list(cands.values())
     enrich(http, species, log)
-    places = fetch_places(http, [s["qid"] for s in species])
-    gb = crawl_gbif(http, [s["sciName"] for s in species], gbif_max, 300, log)
+    places = fetch_places(http, [s["qid"] for s in species if s.get("qid")])
+    gb = crawl_gbif(http, [s["sciName"] for s in species], gbif_max, 300, log,
+                    keys={s["sciName"]: s.get("gbifId") for s in species})
     out = []
     for s in species:
         ov = overrides.get(s["sciName"], {})
-        g, place = gb.get(s["sciName"], {}), places.get(s["qid"], {})
+        g, place = gb.get(s["sciName"], {}), places.get(s.get("qid"), {})
         hint = extinction_hint(s.get("summary", ""))
         year, approx, ysrc = None, False, ""
         if "year" in ov:
@@ -643,7 +807,7 @@ def build_extinct(http, taxa, category=None, overrides=None, gbif_max=150, depth
             "img": s.get("img", ""), "imgLicense": s.get("imgLicense", ""), "imgArtist": s.get("imgArtist", ""),
             "imgPage": s.get("imgPage", ""), "summary": ov.get("summary", s.get("summary", "")),
             "wikipedia": "https://en.wikipedia.org/wiki/" + urllib.parse.quote((s.get("wikiTitle") or s["sciName"]).replace(" ", "_")),
-            "source": s["source"], "verified": bool(ov)})
+            "source": s["source"], "verified": bool(ov), **({"iucnStatus": s["iucnStatus"]} if s.get("iucnStatus") else {})})
     out.sort(key=lambda r: (r["year"] is None, r["year"] or 0))
     return out
 
@@ -676,21 +840,45 @@ def needs_image(img):
     return not img.startswith("http") or "Status_iucn" in img
 
 
+def name_key(name):
+    return (name or "").replace("_", " ").strip().lower()
+
+
+def find_row(idx, s, taken=()):
+    """Index der Atlaszeile zur Art: erst der Name, dann Synonyme (z. B. der IUCN-Name aus MDD)."""
+    i = idx.get(name_key(s["sciName"]))
+    if i is not None:
+        return i, False
+    for alt in s.get("synonyms") or []:
+        i = idx.get(name_key(alt))
+        if i is not None and i not in taken:
+            return i, True
+    return None, False
+
+
 def merge_species(rows, taxa, gbif=None, update_status=False, add_new=True):
     """Fuehrt Crawler-Daten in die Zeilen ein. Rueckgabe: (neue Zeilen, Bericht, Herkunft). Loescht nie Zeilen."""
     gbif = gbif or {}
     rows = [list(r) for r in rows]
-    idx = {r[1].lower().replace("_", " "): i for i, r in enumerate(rows)}
+    idx = {name_key(r[1]): i for i, r in enumerate(rows)}
     unknown_w = next((r[6] for r in rows if r[6].startswith("?")), "? kg")
     unknown_l = next((r[7] for r in rows if r[7].startswith("?")), "? J.")
     rep = {"bilder": 0, "gewichte": 0, "lebensdauern": 0, "gebiete": 0, "status_geaendert": [], "neu": 0,
-           "neu_ausgestorben": 0, "uebersprungen_ohne_status": 0}
+           "neu_ausgestorben": 0, "uebersprungen_ohne_status": 0, "uebersprungen_haustier": 0,
+           "status_konflikt": 0, "namensabweichungen": [], "laut_quelle_ausgestorben": []}
     prov = {}
+    exact = {idx[name_key(s["sciName"])] for s in taxa if name_key(s["sciName"]) in idx}
+    taken = set(exact)                     # jede Atlaszeile wird hoechstens einer Art zugeordnet
     for s in taxa:
         name = s["sciName"]
         g = gbif.get(name, {})
-        if name.lower() in idx:
-            row, p = rows[idx[name.lower()]], {}
+        src = s.get("source", "wikidata")
+        i, via_synonym = find_row(idx, s, taken)
+        if i is not None and via_synonym:
+            taken.add(i)
+            rep["namensabweichungen"].append((rows[i][1], name))
+        if i is not None:
+            row, p = rows[i], {}
             if needs_image(row[5]) and s.get("img") and s.get("imgLicense"):
                 row[5] = s["img"]; rep["bilder"] += 1
                 p["img"] = {"source": "wikipedia", "license": s["imgLicense"], "page": s.get("imgPage", "")}
@@ -700,27 +888,37 @@ def merge_species(rows, taxa, gbif=None, update_status=False, add_new=True):
             if row[7].startswith("?") and fmt_lifespan(s.get("lifespanYears")):
                 row[7] = fmt_lifespan(s["lifespanYears"]); rep["lebensdauern"] += 1
                 p["lifespan"] = (s.get("traitSource") or {}).get("lifespanYears", "wikidata")
-            if update_status and s.get("status") and s["status"] != row[4]:
-                rep["status_geaendert"].append((name, row[4], s["status"])); row[4] = s["status"]
-                p["status"] = "wikidata"
+            if update_status and s.get("status") and s["status"] != row[4] and s["status"] != "NE":
+                if s.get("statusConflict"):    # mehrere gleichrangige Angaben in der Quelle: nicht raten
+                    rep["status_konflikt"] += 1
+                else:
+                    rep["status_geaendert"].append((name, row[4], s["status"])); row[4] = s["status"]
+                    p["status"] = s.get("statusSource", "wikidata")
+            if s.get("extinct") and row[4] not in ("EX", "EW"):
+                rep["laut_quelle_ausgestorben"].append((row[1], row[4]))
             if not row[8].strip() and g.get("range"):
                 row[8] = g["range"]; rep["gebiete"] += 1
                 p["range"] = "gbif-hull (grobe Naeherung)"
             if p:
-                prov[name.replace(" ", "_")] = p
+                prov[row[1]] = p
         elif add_new:
-            if s.get("status") in ("EX", "EW"):
+            if s.get("status") in ("EX", "EW") or s.get("extinct"):
                 rep["neu_ausgestorben"] += 1
+                continue
+            if s.get("domestic"):
+                rep["uebersprungen_haustier"] += 1
                 continue
             if not s.get("status"):
                 rep["uebersprungen_ohne_status"] += 1
                 continue
             img = s["img"] if s.get("img") and s.get("imgLicense") else ""
-            rows.append([s["common"], name.replace(" ", "_"), s.get("order", ""), s.get("family", ""), s["status"], img,
+            rows.append([s.get("common") or name, name.replace(" ", "_"), s.get("order", ""), s.get("family", ""), s["status"], img,
                          fmt_weight(s.get("massG")) or unknown_w, fmt_lifespan(s.get("lifespanYears")) or unknown_l,
                          g.get("range") or ""])
+            idx[name_key(name)] = len(rows) - 1
+            taken.add(len(rows) - 1)
             rep["neu"] += 1
-            prov[name.replace(" ", "_")] = {"added": date.today().isoformat(), "source": "wikidata",
+            prov[name.replace(" ", "_")] = {"added": date.today().isoformat(), "source": src,
                                             **({"range": "gbif-hull (grobe Naeherung)"} if g.get("range") else {}),
                                             **({"img": {"source": "wikipedia", "license": s["imgLicense"], "page": s.get("imgPage", "")}} if img else {})}
     return rows, rep, prov
@@ -728,7 +926,8 @@ def merge_species(rows, taxa, gbif=None, update_status=False, add_new=True):
 
 def print_report(rep):
     print("\n=== Bericht ===")
-    print(f"Neue lebende Arten:       {rep['neu']}  (ohne Status uebersprungen: {rep['uebersprungen_ohne_status']})")
+    print(f"Neue lebende Arten:       {rep['neu']}  (ohne Status uebersprungen: {rep['uebersprungen_ohne_status']}, "
+          f"Haustiere uebersprungen: {rep['uebersprungen_haustier']})")
     print(f"Bilder ersetzt/ergaenzt:  {rep['bilder']}")
     print(f"Gewichte ergaenzt:        {rep['gewichte']}")
     print(f"Lebensdauern ergaenzt:    {rep['lebensdauern']}")
@@ -738,6 +937,17 @@ def print_report(rep):
     print(f"Status abweichend:        {len(ch)}")
     for n, a, b in ch[:15]:
         print(f"   {n}: {a} -> {b}")
+    if rep.get("status_konflikt"):
+        print(f"Status nicht uebernommen (widerspruechliche Angaben): {rep['status_konflikt']}")
+    syn = rep.get("namensabweichungen") or []
+    print(f"Ueber Synonym zugeordnet: {len(syn)}  (Atlasname bleibt)")
+    for atlas, new in syn[:15]:
+        print(f"   {atlas} = {new}")
+    ext = rep.get("laut_quelle_ausgestorben") or []
+    if ext:
+        print(f"Laut Quelle ausgestorben, im Atlas lebend: {len(ext)}  (bitte pruefen, wird nicht geaendert)")
+        for n, st in ext[:15]:
+            print(f"   {n} ({st})")
 
 
 # --------------------------------------------------------------------------- Kommandozeile
@@ -763,6 +973,15 @@ def build_parser():
     t.add_argument("--limit-per-order", type=int, default=None, help="zum Testen: hoechstens N Arten je Ordnung")
     t.add_argument("--out", default="crawl/taxa.json")
 
+    md = sub.add_parser("mdd", help="vollstaendige Artenliste aus der Mammal Diversity Database (lokale CSV) plus Wikidata-Abgleich")
+    md.add_argument("--file", default="", help="MDD-Artenliste (Standard: neueste MDD/MDD_v*_*species.csv)")
+    md.add_argument("--synonyms", default="", help="MDD-Synonymliste (Standard: neueste MDD/Species_Syn*_v*.csv, '-' = keine)")
+    md.add_argument("--data", default="data", help="Atlasdaten, nur gelesen: Atlasnamen werden ueber Synonyme zugeordnet")
+    md.add_argument("--orders", default="", help="nur diese Ordnungen, kommagetrennt")
+    md.add_argument("--limit-per-order", type=int, default=None, help="zum Testen: hoechstens N Arten je Ordnung")
+    md.add_argument("--no-wikidata", action="store_true", help="ohne Netz: nur die MDD-Datei einlesen")
+    md.add_argument("--out", default="crawl/taxa.json")
+
     e = sub.add_parser("enrich", help="Bilder, Lizenzen und Texte aus Wikipedia/Commons")
     e.add_argument("--taxa", default="crawl/taxa.json")
     e.add_argument("--data", default="data", help="wenn gesetzt: nur Arten ohne echtes Bild oder neue Arten bearbeiten")
@@ -783,7 +1002,7 @@ def build_parser():
     x.add_argument("--depth", type=int, default=1)
     x.add_argument("--overrides", default="data/extinct_overrides.json", help="eigene Korrekturen je Art (Jahr, Ort, Ursache ...)")
     x.add_argument("--gbif-max", type=int, default=150)
-    x.add_argument("--out", default="data/extinct_species.json")
+    x.add_argument("--out", default="crawl/extinct_species.json", help="erst pruefen, dann nach data/ kopieren")
 
     m = sub.add_parser("merge", help="in species_part_*.txt zusammenfuehren (ohne --apply nur Vorschau)")
     m.add_argument("--data", default="data"); m.add_argument("--taxa", default="crawl/taxa.json")
@@ -803,12 +1022,28 @@ def main(argv=None, http=None):
     if a.cmd == "taxa":
         only = [o for o in a.orders.split(",") if o.strip()]
         _save(a.out, crawl_taxa(http, only or None, a.limit_per_order))
+    elif a.cmd == "mdd":
+        auto_file, auto_syn = find_mdd_files()
+        path = a.file or auto_file
+        if not path:
+            raise SystemExit("Keine MDD-Datei gefunden. Mit --file angeben (Download: mammaldiversity.org).")
+        only = [o for o in a.orders.split(",") if o.strip()]
+        taxa = load_mdd(path, only or None, a.limit_per_order)
+        print(f"{len(taxa)} Arten aus {path}")
+        syn = None if a.synonyms == "-" else (a.synonyms or auto_syn)
+        rows = read_species(a.data) if Path(a.data).exists() else []
+        if rows and not only and not a.limit_per_order:
+            print(f"{link_synonyms(taxa, syn, [r[1] for r in rows])} Atlasnamen ueber die MDD-Synonymliste zugeordnet")
+        if not a.no_wikidata:
+            attach_wikidata(http, taxa)
+        _save(a.out, taxa)
     elif a.cmd == "enrich":
         taxa = _load(a.taxa)
         todo = taxa
         if not a.all and Path(a.data).exists():
-            have = {r[1].lower().replace("_", " "): r for r in read_species(a.data)}
-            todo = [s for s in taxa if s["sciName"].lower() not in have or needs_image(have[s["sciName"].lower()][5])]
+            rows = read_species(a.data)
+            idx = {name_key(r[1]): i for i, r in enumerate(rows)}
+            todo = [s for s in taxa if find_row(idx, s)[0] is None or needs_image(rows[find_row(idx, s)[0]][5])]
         print(f"{len(todo)} von {len(taxa)} Arten werden angereichert")
         enrich(http, todo)
         _save(a.taxa, taxa)
@@ -819,11 +1054,13 @@ def main(argv=None, http=None):
         _save(a.taxa, taxa)
     elif a.cmd == "gbif":
         taxa = _load(a.taxa)
-        have = {r[1].lower().replace("_", " "): r for r in read_species(a.data)}
-        names = [s["sciName"] for s in taxa if s.get("status") not in ("EX", "EW")
-                 and (s["sciName"].lower() not in have or not have[s["sciName"].lower()][8].strip())]
+        rows = read_species(a.data)
+        idx = {name_key(r[1]): i for i, r in enumerate(rows)}
+        names = [s["sciName"] for s in taxa if s.get("status") not in ("EX", "EW") and not s.get("extinct")
+                 and (find_row(idx, s)[0] is None or not rows[find_row(idx, s)[0]][8].strip())]
         print(f"{len(names)} Arten ohne Gebiet, bearbeitet werden bis zu {a.max_species}")
-        _save(a.out, crawl_gbif(http, names, a.max_species, a.max_records))
+        _save(a.out, crawl_gbif(http, names, a.max_species, a.max_records,
+                                keys={s["sciName"]: s.get("gbifId") for s in taxa}))
     elif a.cmd == "extinct":
         ov = _load(a.overrides) if Path(a.overrides).exists() else {}
         data = build_extinct(http, _load(a.taxa), a.category or None, ov, a.gbif_max, a.depth)

@@ -275,8 +275,8 @@ async function loadMapLibre() {
   return false;
 }
 
-const STATUS_COLORS = { LC:"#4ade80", NT:"#a3e635", VU:"#facc15", EN:"#fb923c", CR:"#ef4444", EW:"#c084fc", EX:"#f5f5f5", DD:"#94a3b8" };
-const STATUS_LABELS = { LC:"Least Concern", NT:"Near Threatened", VU:"Vulnerable", EN:"Endangered", CR:"Critically Endangered", EW:"Extinct in the Wild", EX:"Extinct", DD:"Data Deficient" };
+const STATUS_COLORS = { LC:"#4ade80", NT:"#a3e635", VU:"#facc15", EN:"#fb923c", CR:"#ef4444", EW:"#c084fc", EX:"#f5f5f5", DD:"#94a3b8", NE:"#64748b" };
+const STATUS_LABELS = { LC:"Least Concern", NT:"Near Threatened", VU:"Vulnerable", EN:"Endangered", CR:"Critically Endangered", EW:"Extinct in the Wild", EX:"Extinct", DD:"Data Deficient", NE:"Not Evaluated" };
 
 const TAXONOMY_LABELS = {
   "RODENTIA": "Nagetiere", "CHIROPTERA": "Fledertiere", "PRIMATES": "Primaten",
@@ -294,7 +294,7 @@ const TAXONOMY_LABELS = {
 
 /* ATLAS-CORE-START: reine Funktionen (ohne DOM), siehe README */
 // Prioritaet beim Darstellen: echtes Foto zuerst, dann Gefaehrdung
-const SEVERITY = { CR: 7, EN: 6, VU: 5, NT: 4, EW: 3, LC: 2, DD: 1, EX: 0 };
+const SEVERITY = { CR: 7, EN: 6, VU: 5, NT: 4, EW: 3, LC: 2, DD: 1, NE: 0, EX: 0 };
 
 // "lng|lat;lng|lat*..." -> { rings: Float64Array[], boxes: [minX,minY,maxX,maxY][], bbox }
 function parseRange(str) {
@@ -811,7 +811,7 @@ function buildFilterChips() {
   
   make("order-chips", unique(state.species.map(s => s.order).filter(Boolean)), "orders");
   make("family-chips", unique(state.species.map(s => s.family).filter(Boolean)), "families");
-  make("status-chips", ["LC","NT","VU","EN","CR","EW","EX","DD"].filter(s => state.species.some(sp => sp.status === s)), "statuses", true);
+  make("status-chips", ["LC","NT","VU","EN","CR","EW","EX","DD","NE"].filter(s => state.species.some(sp => sp.status === s)), "statuses", true);
 }
 
 function applyFilters() {

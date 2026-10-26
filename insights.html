@@ -188,7 +188,7 @@
 <script>
 /* ATLAS-CORE-START: reine Funktionen (ohne DOM), siehe README */
 // Prioritaet beim Darstellen: echtes Foto zuerst, dann Gefaehrdung
-const SEVERITY = { CR: 7, EN: 6, VU: 5, NT: 4, EW: 3, LC: 2, DD: 1, EX: 0 };
+const SEVERITY = { CR: 7, EN: 6, VU: 5, NT: 4, EW: 3, LC: 2, DD: 1, NE: 0, EX: 0 };
 
 // "lng|lat;lng|lat*..." -> { rings: Float64Array[], boxes: [minX,minY,maxX,maxY][], bbox }
 function parseRange(str) {
@@ -437,7 +437,7 @@ async function loadMapLibre() {
 const STATUS = {
   LC: ["Least Concern", "#4ade80"], NT: ["Near Threatened", "#a3e635"], VU: ["Vulnerable", "#facc15"],
   EN: ["Endangered", "#fb923c"], CR: ["Critically Endangered", "#ef4444"],
-  EW: ["Extinct in the Wild", "#c084fc"], EX: ["Extinct", "#f5f5f5"], DD: ["Data Deficient", "#94a3b8"]
+  EW: ["Extinct in the Wild", "#c084fc"], EX: ["Extinct", "#f5f5f5"], DD: ["Data Deficient", "#94a3b8"], NE: ["Not Evaluated", "#64748b"]
 };
 const THREATENED = ["VU", "EN", "CR"];
 const isThr = s => THREATENED.includes(s.status);
@@ -605,7 +605,7 @@ function openCell(i, j) {
   const g = getGrid(), x0 = -180 + i * g.cell, y0 = -90 + j * g.cell, x1 = x0 + g.cell, y1 = y0 + g.cell;
   if (mapReady && map.getSource("sel")) map.getSource("sel").setData({ type: "Feature", geometry: { type: "Polygon", coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] } });
   const list = g.list.filter(s => s.range && coversCell(s.range, g.cell, i, j));
-  const sev = { CR: 7, EN: 6, VU: 5, NT: 4, EW: 3, LC: 2, DD: 1, EX: 0 };
+  const sev = { CR: 7, EN: 6, VU: 5, NT: 4, EW: 3, LC: 2, DD: 1, NE: 0, EX: 0 };
   list.sort((a, b) => (sev[b.status] - sev[a.status]) || a.common.localeCompare(b.common));
   const thr = list.filter(isThr).length, byOrder = {};
   list.forEach(s => byOrder[s.order] = (byOrder[s.order] || 0) + 1);
@@ -678,7 +678,7 @@ function barRow(name, segments, max, valText, attrs = "") {
 function filterOrder(o) { S.order = o; $("orderSel").value = o; refresh(); $("hotspots").scrollIntoView({ behavior: "smooth" }); }
 function renderStatusAndOrders() {
   const total = SP.length, counts = {}; SP.forEach(s => counts[s.status] = (counts[s.status] || 0) + 1);
-  const keys = ["CR", "EN", "VU", "NT", "LC", "DD", "EW", "EX"].filter(k => counts[k]);
+  const keys = ["CR", "EN", "VU", "NT", "LC", "DD", "NE", "EW", "EX"].filter(k => counts[k]);
   const R = 70, C = 2 * Math.PI * R; let off = 0;
   const segs = keys.map(k => { const len = C * counts[k] / total; const s = `<circle r="${R}" cx="90" cy="90" fill="none" stroke="${STATUS[k][1]}" stroke-width="26" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 90 90)"><title>${esc(k)}: ${fmt(counts[k])}</title></circle>`; off += len; return s; }).join("");
   $("donut").innerHTML = `<svg viewBox="0 0 180 180" width="180" height="180" role="img" aria-label="Verteilung der Schutzkategorien">${segs}<text x="90" y="88" text-anchor="middle" style="fill:#e6edf3;font-size:22px;font-weight:600">${fmt(total)}</text><text x="90" y="106" text-anchor="middle">Arten</text></svg>
@@ -710,7 +710,7 @@ function renderRanges() {
   $("histChart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Histogramm der Verbreitungsgebietsgrößen">${yt}${bars}${ticks}<text x="${W / 2}" y="${H - 4}" text-anchor="middle">Gebietsgröße in km²</text></svg>`;
   // Median je Status
   const byS = {}; withA.forEach(s => (byS[s.status] = byS[s.status] || []).push(s.area));
-  const meds = ["CR", "EN", "VU", "NT", "LC", "DD"].filter(k => byS[k] && byS[k].length >= 3).map(k => [k, median(byS[k]), byS[k].length]);
+  const meds = ["CR", "EN", "VU", "NT", "LC", "DD", "NE"].filter(k => byS[k] && byS[k].length >= 3).map(k => [k, median(byS[k]), byS[k].length]);
   $("medianChart").innerHTML = meds.map(([k, v, n]) => barRow(`${k} · ${STATUS[k][0]}`, [{ v: Math.log10(Math.max(1, v)), c: STATUS[k][1] }], 8, areaText(v))).join("")
     + `<p class="sub" style="margin-top:10px">Bedrohte Arten haben typischerweise deutlich kleinere Gebiete als Arten ohne Gefährdung.</p>`;
   // Listen

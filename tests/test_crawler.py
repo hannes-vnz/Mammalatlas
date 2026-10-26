@@ -218,3 +218,111 @@ def test_ausgestorbenen_datensatz_aufbauen(tmp_path):
     assert t["img"] == "https://img/thyl.jpg" and t["imgLicense"] == "Public domain" and {"Jagd", "Lebensraumverlust"} <= set(t["causes"])
     assert q["year"] == 1883 and q["lat"] == -32.0 and q["region"] == "Suedafrika" and q["verified"] and q["source"] == "wikipedia-category"
     assert [r["year"] for r in out] == [1883, 1936]                              # nach Jahr sortiert
+
+
+# ------------------------------------------------------------------ Fehler, die erst bei echten Antworten auftreten
+def test_qid_als_label_wird_ignoriert_und_arten_nur_einmal():
+    Q = "http://www.wikidata.org/entity/"
+    (s,) = c.collapse_rows([B(item=Q + "Q5", name="Aaa bbb", label="Q5", title="Aaa bbb")], "Rodentia")
+    assert s["common"] == "Aaa bbb"
+    orders = sparql_result([B(o=Q + "Q10", name="Artiodactyla"), B(o=Q + "Q11", name="Cetartiodactyla")])
+    whale = sparql_result([B(item=Q + "Q7", name="Balaena mysticetus", statusLabel="least concern")])
+    http = Fake([(sparql_has("P171*"), orders), (sparql_has("SELECT DISTINCT ?item"), whale)])
+    assert [t["qid"] for t in c.crawl_taxa(http, log=lambda *a: None)] == ["Q7"]
+
+
+def test_http_fehlerantwort_wird_nicht_gecacht(tmp_path, monkeypatch):
+    class Resp:
+        def __init__(self, body): self.body = body
+        def read(self): return self.body
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    monkeypatch.setattr(c.urllib.request, "urlopen", lambda req, timeout: Resp(b'{"error": {"code": "toomanyvalues", "info": "zu viele"}}'))
+    http = c.Http(tmp_path, delay=0)
+    with pytest.raises(c.CrawlError, match="toomanyvalues"):
+        http.get_json(c.WIKIPEDIA_API, {"action": "query"})
+    assert not list(tmp_path.glob("*.json"))
+    assert c._retry_after("12") == 12 and c._retry_after("Wed, 21 Oct 2015 07:28:00 GMT") == 1 and c._retry_after("x") is None
+
+
+def test_wikipedia_folgt_continue_und_entities_im_urheber():
+    first = {"continue": {"excontinue": "1", "continue": "||"}, "query": {"pages": [
+        {"title": "A", "pageprops": {"wikibase_item": "Q1"}, "extract": "Erster Text."},
+        {"title": "B", "pageprops": {"wikibase_item": "Q2"}}]}}
+    second = {"query": {"pages": [{"title": "A", "pageprops": {"wikibase_item": "Q1"}},
+                                  {"title": "B", "pageprops": {"wikibase_item": "Q2"}, "extract": "Zweiter Text."}]}}
+    http = Fake([(lambda u, p: "excontinue" in p, second), (lambda u, p: u == c.WIKIPEDIA_API, first)])
+    out = c.wikipedia_pages(http, ["A", "B"])
+    assert out["Q1"]["summary"] == "Erster Text." and out["Q2"]["summary"] == "Zweiter Text."
+    assert c._strip_html("Jane&nbsp;Doe &amp; Co") == "Jane Doe & Co"
+
+
+def test_gbif_synonym_nimmt_anerkannten_schluessel():
+    http = Fake([(lambda u, p: u.endswith("/species/match"),
+                  {"matchType": "EXACT", "rank": "SPECIES", "status": "SYNONYM", "usageKey": 1, "acceptedUsageKey": 2})])
+    assert c.gbif_key(http, "Alter name") == 2
+
+
+def test_lebensdauer_aus_tabelle_ersetzt_wikidata():
+    sp = [{"sciName": "Dasyphractus vellerosus", "synonyms": ["Chaetophractus vellerosus"], "lifespanYears": 9.0, "massG": 800.0}]
+    c.apply_traits(sp, [("anage", {"chaetophractus vellerosus": {"massG": 900.0, "lifespanYears": 30.0}})])
+    assert sp[0]["lifespanYears"] == 30.0 and sp[0]["massG"] == 800.0 and sp[0]["traitSource"] == {"lifespanYears": "anage"}
+
+
+# ------------------------------------------------------------------ MDD
+MDD_CSV = ("sciName,id,mainCommonName,order,family,iucnStatus,extinct,domestic\n"
+           "Vulpes_vulpes,1,Red Fox,Carnivora,Canidae,LC,0,0\n"
+           "Dasyphractus_vellerosus,2,Screaming Hairy Armadillo,Cingulata,Chlamyphoridae,LC (as Chaetophractus vellerosus),0,0\n"
+           "Dactylonax_palpator,3,Long-fingered Triok,Diprotodontia,Petauridae,NA,0,0\n"
+           "Neue_art,4,NA,Rodentia,Muridae,NE,0,0\n"
+           "Canis_familiaris,5,Dog,Carnivora,Canidae,NE,0,1\n"
+           "Bettongia_penicillata,6,Southeastern Bettong,Diprotodontia,Potoroidae,NT,1,0\n")
+SYN_CSV = ("MDD_species,MDD_original_combination,MDD_normalized_original_combination,MDD_original_rank\n"
+           "Dactylonax palpator,Dactylopsila palpator,,species\n"
+           "Vulpes vulpes,Canis alopex,,species\n")
+
+
+def test_mdd_einlesen_und_synonyme(tmp_path):
+    (tmp_path / "MDD_v2.5_6species.csv").write_text(MDD_CSV, encoding="utf-8")
+    (tmp_path / "Species_Syn_Current_v2.5.csv").write_text(SYN_CSV, encoding="utf-8")
+    f, syn = c.find_mdd_files(tmp_path)
+    taxa = c.load_mdd(f)
+    by = {t["sciName"]: t for t in taxa}
+    arm, neu = by["Dasyphractus vellerosus"], by["Neue art"]
+    assert arm["status"] == "LC" and arm["synonyms"] == ["Chaetophractus vellerosus"] and arm["order"] == "CINGULATA"
+    assert neu["common"] == "Neue art" and neu["status"] == "NE" and by["Dactylonax palpator"]["status"] == ""
+    assert by["Canis familiaris"]["domestic"] and by["Bettongia penicillata"]["extinct"]
+    assert c.link_synonyms(taxa, syn, ["Dactylopsila_palpator", "Vulpes_vulpes", "Unbekannt_x"]) == 1
+    assert by["Dactylonax palpator"]["synonyms"] == ["Dactylopsila palpator"]
+    assert len(c.load_mdd(f, ["Carnivora"])) == 2 and len(c.load_mdd(f, limit_per_order=1)) == 4
+
+
+def test_mdd_wikidata_abgleich_ueber_synonym():
+    Q = "http://www.wikidata.org/entity/"
+    rows = sparql_result([B(item=Q + "Q9", name="Chaetophractus vellerosus", label="screaming hairy armadillo",
+                            title="Screaming hairy armadillo", gbif="2440", iucn="89604", mass="0.86")])
+    http = Fake([(sparql_has("VALUES ?name"), rows)])
+    taxa = [{"sciName": "Dasyphractus vellerosus", "synonyms": ["Chaetophractus vellerosus"], "qid": None, "wikiTitle": None,
+             "imageFile": None, "iucnId": None, "gbifId": None, "massG": None, "lifespanYears": None}]
+    c.attach_wikidata(http, taxa, log=lambda *a: None)
+    assert taxa[0]["qid"] == "Q9" and taxa[0]["gbifId"] == "2440" and taxa[0]["massG"] == 860.0
+    assert '"Dasyphractus vellerosus"' in http.calls[0][1]["query"]
+
+
+def test_merge_mit_mdd_synonym_ne_haustier_und_ohne_doppel():
+    rows = [["Screaming Hairy Armadillo", "Chaetophractus_vellerosus", "CINGULATA", "CHLAMYPHORIDAE", "LC", "", "? kg", "? J.", ""],
+            ["Brush-tailed Bettong", "Bettongia_penicillata", "DIPROTODONTIA", "POTOROIDAE", "NT", "", "? kg", "? J.", ""]]
+    taxa = [{"sciName": "Dasyphractus vellerosus", "synonyms": ["Chaetophractus vellerosus"], "status": "LC", "massG": 860.0, "source": "mdd"},
+            {"sciName": "Bettongia penicillata", "synonyms": [], "status": "NT", "extinct": True, "source": "mdd"},
+            {"sciName": "Neue art", "common": "Neue art", "order": "RODENTIA", "family": "MURIDAE", "status": "NE", "source": "mdd"},
+            {"sciName": "Neue art", "common": "Neue art", "order": "RODENTIA", "family": "MURIDAE", "status": "NE", "source": "mdd"},
+            {"sciName": "Canis familiaris", "status": "NE", "domestic": True, "source": "mdd"}]
+    out, rep, prov = c.merge_species(rows, taxa, update_status=True)
+    names = [r[1] for r in out]
+    assert names == ["Chaetophractus_vellerosus", "Bettongia_penicillata", "Neue_art"]          # kein Doppel, kein Hund
+    assert out[0][6] == "860 g" and prov["Chaetophractus_vellerosus"]["weight"] == "wikidata"
+    assert rep["namensabweichungen"] == [("Chaetophractus_vellerosus", "Dasyphractus vellerosus")]
+    assert rep["laut_quelle_ausgestorben"] == [("Bettongia_penicillata", "NT")] and out[1][4] == "NT"
+    assert rep["uebersprungen_haustier"] == 1 and out[2][4] == "NE" and prov["Neue_art"]["source"] == "mdd"
+    _, rep, _ = c.merge_species([["X", "Aaa_bbb", "", "", "DD", "", "? kg", "? J.", ""]], [{"sciName": "Aaa bbb", "status": "NE"}], update_status=True)
+    assert rep["status_geaendert"] == []                                   # NE ersetzt keine echte Bewertung

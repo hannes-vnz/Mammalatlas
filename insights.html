@@ -193,7 +193,7 @@
     <p style="margin-top:10px"><button class="btn" id="famMore">Alle Familien anzeigen</button></p>
   </section>
 
-  <p class="note">Hinweise: Grundlage sind die Verbreitungspolygone des Datensatzes. Sie zeigen, wo Gebiete liegen, nicht gezählte Individuen. Bei der Rasterung zählt jede Art je Zelle einmal (Zellmittelpunkt oder Eckpunkt im Gebiet). Gebiete über die 180°-Datumsgrenze (40 Polygone) werden ausgelassen. Der Endemismus-Index verteilt je Art ein Gewicht von 1 gleichmäßig auf ihre Zellen: eine Art, die nur eine Zelle besiedelt, zählt voll, eine weit verbreitete kaum. Arten ohne Polygon fehlen in der Karte, zählen aber in den Statistiken.</p>
+  <p class="note">Hinweise: Grundlage sind die Verbreitungspolygone des Datensatzes. Sie zeigen, wo Gebiete liegen, nicht gezählte Individuen. Bei der Rasterung zählt jede Art je Zelle einmal (Zellmittelpunkt oder Eckpunkt im Gebiet). Teilflächen, die über die 180°-Datumsgrenze springen, werden ausgelassen. Der Endemismus-Index verteilt je Art ein Gewicht von 1 gleichmäßig auf ihre Zellen: eine Art, die nur eine Zelle besiedelt, zählt voll, eine weit verbreitete kaum. Arten ohne Polygon fehlen in der Karte, zählen aber in den Statistiken.</p>
   </div>
 </main>
 <div id="toast"></div>
@@ -356,13 +356,25 @@ function pickMarkers(list, view, project, opts) {
 /* ATLAS-CORE-END */
 
 /* ATLAS-RASTER-START: Flaechen und Artenvielfalt-Raster (nur Insights-Seite) */
-// Verbreitungsgebiet in km2 (flaechentreue Naeherung ueber lng*cos(lat)); NaN bei Gebieten ueber den 180-Grad-Meridian
+// Springt der Ring ueber die Datumsgrenze (zwei aufeinanderfolgende Punkte > 180 Grad auseinander)?
+// Breite Gebiete wie bei Walen oder rund um die Arktis reichen legitim von -180 bis 180 und zaehlen mit.
+const _wraps = new WeakMap();
+function ringWraps(ring) {
+  let w = _wraps.get(ring);
+  if (w === undefined) {
+    w = false;
+    for (let k = 2; k < ring.length; k += 2) if (Math.abs(ring[k] - ring[k - 2]) > 180) { w = true; break; }
+    _wraps.set(ring, w);
+  }
+  return w;
+}
+
+// Verbreitungsgebiet in km2 (flaechentreue Naeherung ueber lng*cos(lat)); NaN bei Gebieten, die ueber die Datumsgrenze springen
 function rangeAreaKm2(range) {
   let total = 0;
   for (let r = 0; r < range.rings.length; r++) {
-    const b = range.boxes[r];
-    if (b[2] - b[0] > 180) return NaN;
     const ring = range.rings[r], n = ring.length;
+    if (ringWraps(ring)) return NaN;
     let a = 0;
     for (let i = 0, j = n - 2; i < n; j = i, i += 2) {
       const xi = ring[i] * Math.cos(ring[i + 1] * Math.PI / 180), xj = ring[j] * Math.cos(ring[j + 1] * Math.PI / 180);
@@ -395,7 +407,7 @@ function rasterize(species, cell, isThreatened) {
     };
     for (let r = 0; r < sp.range.rings.length; r++) {
       const ring = sp.range.rings[r], b = sp.range.boxes[r];
-      if (b[2] - b[0] > 180) { skipped++; continue; }
+      if (ringWraps(ring)) { skipped++; continue; }
       const j0 = Math.max(0, Math.floor((b[1] + 90) / cell)), j1 = Math.min(H - 1, Math.floor((b[3] + 90) / cell));
       const rows = new Array(j1 - j0 + 1);
       for (let i = 0; i < rows.length; i++) rows[i] = [];
@@ -429,9 +441,8 @@ function rasterize(species, cell, isThreatened) {
 function coversCell(range, cell, i, j) {
   const x0 = -180 + i * cell, y0 = -90 + j * cell, x1 = x0 + cell, y1 = y0 + cell, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   for (let r = 0; r < range.rings.length; r++) {
-    const b = range.boxes[r];
-    if (b[2] - b[0] > 180 || b[0] > x1 || b[2] < x0 || b[1] > y1 || b[3] < y0) continue;
-    const ring = range.rings[r];
+    const b = range.boxes[r], ring = range.rings[r];
+    if (b[0] > x1 || b[2] < x0 || b[1] > y1 || b[3] < y0 || ringWraps(ring)) continue;
     if (pointInRing(cx, cy, ring)) return true;
     for (let k = 0; k < ring.length; k += 2) {
       if (Math.floor((ring[k] + 180) / cell) === i && Math.floor((ring[k + 1] + 90) / cell) === j) return true;
@@ -536,6 +547,7 @@ function animateTo(el, to) {
   const t0 = performance.now(), dur = 900;
   const step = now => { const f = Math.min(1, (now - t0) / dur); el.textContent = fmt(to * (1 - Math.pow(1 - f, 3))); if (f < 1) requestAnimationFrame(step); };
   requestAnimationFrame(step);
+  setTimeout(() => { el.textContent = fmt(to); }, dur + 150);   // falls der Tab im Hintergrund ist und rAF ruht
 }
 function renderKpis() {
   const total = SP.length, thr = SP.filter(isThr).length, dd = SP.filter(s => s.status === "DD").length;

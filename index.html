@@ -484,8 +484,21 @@ function pickMarkers(list, view, project, opts) {
   return out;
 }
 
+// Springt der Ring ueber die Datumsgrenze (zwei aufeinanderfolgende Punkte > 180 Grad auseinander)?
+// Breite Gebiete wie bei Walen oder rund um die Arktis reichen legitim von -180 bis 180 und zaehlen mit.
+const _wraps = new WeakMap();
+function ringWraps(ring) {
+  let w = _wraps.get(ring);
+  if (w === undefined) {
+    w = false;
+    for (let k = 2; k < ring.length; k += 2) if (Math.abs(ring[k] - ring[k - 2]) > 180) { w = true; break; }
+    _wraps.set(ring, w);
+  }
+  return w;
+}
+
 // Artenvielfalt als Raster (Scanline-Fuellung je Polygon, jede Art zaehlt je Zelle einmal)
-// species: [{range, ...}], cell in Grad, pass: Funktion(sp) -> bool; Gebiete >180 Grad Breite werden ausgelassen
+// species: [{range, ...}], cell in Grad, pass: Funktion(sp) -> bool; Teilflaechen, die ueber die Datumsgrenze springen, werden ausgelassen
 function richnessGrid(species, cell, pass) {
   const W = Math.round(360 / cell), H = Math.round(180 / cell);
   const counts = new Uint16Array(W * H), stamp = new Int32Array(W * H);
@@ -495,7 +508,7 @@ function richnessGrid(species, cell, pass) {
     sid++;
     for (let r = 0; r < sp.range.rings.length; r++) {
       const ring = sp.range.rings[r], b = sp.range.boxes[r];
-      if (b[2] - b[0] > 180) { skipped++; continue; }
+      if (ringWraps(ring)) { skipped++; continue; }
       const mark = (i, j) => {
         if (i < 0 || i >= W || j < 0 || j >= H) return;
         const k = j * W + i;

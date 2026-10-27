@@ -50,6 +50,7 @@ WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 GBIF_API = "https://api.gbif.org/v1"
 IUCN_API = "https://api.iucnredlist.org/api/v4"
+INAT_API = "https://api.inaturalist.org/v1"
 
 Q_MAMMALIA, Q_SPECIES, Q_SUBSPECIES, Q_ORDER, Q_FAMILY = "Q7377", "Q7432", "Q68947", "Q36602", "Q35409"
 
@@ -686,6 +687,64 @@ def crawl_gbif(http, names, max_species=200, max_records=300, log=print, keys=No
         if i % 25 == 0:
             log(f"  GBIF: {i}/{min(len(names), max_species)}")
     return out
+
+
+# --------------------------------------------------------------------------- iNaturalist: Fotos fuer Arten ohne Wikipedia-Bild
+INAT_FREE = ("cc0", "cc-by", "cc-by-sa")
+INAT_NC = ("cc-by-nc", "cc-by-nc-sa")          # nur nichtkommerziell; mit --allow-nc
+
+
+def wikidata_inat_ids(http, qids):
+    """{qid: iNaturalist-Taxon-ID} ueber Wikidata P3151."""
+    out = {}
+    for batch in chunks(sorted(q for q in qids if q), 200):
+        q = ("SELECT ?item ?inat WHERE { VALUES ?item { " + " ".join("wd:" + x for x in batch) + " } ?item wdt:P3151 ?inat . }")
+        for b in sparql(http, q):
+            if (bval(b, "inat") or "").isdigit():
+                out[qid_of(bval(b, "item"))] = bval(b, "inat")
+    return out
+
+
+def inat_license_label(code):
+    return "CC0" if code == "cc0" else "CC " + code[3:].upper() if code else ""
+
+
+def inat_pick_photo(taxon, licenses):
+    """Erstes Foto mit erlaubter Lizenz: Standardfoto, sonst weitere Taxonfotos."""
+    cands = [taxon.get("default_photo") or {}] + [tp.get("photo") or {} for tp in taxon.get("taxon_photos") or []]
+    for ph in cands:
+        if ph.get("license_code") in licenses and ph.get("medium_url"):
+            return {"img": ph["medium_url"], "imgLicense": inat_license_label(ph["license_code"]),
+                    "imgArtist": _strip_html(ph.get("attribution", ""))[:120],
+                    "imgPage": f"https://www.inaturalist.org/photos/{ph.get('id')}", "imgSource": "inaturalist"}
+    return None
+
+
+def inat_photos(http, species, licenses=INAT_FREE, search_limit=300, log=print):
+    """Ergaenzt Arten ohne Foto um ein lizenziertes iNaturalist-Foto (veraendert die Liste). Rueckgabe: Anzahl."""
+    todo = [s for s in species if not s.get("img")]
+    ids = wikidata_inat_ids(http, [s.get("qid") for s in todo])
+    by_id = {}
+    for s in todo:
+        if s.get("qid") in ids:
+            by_id.setdefault(ids[s["qid"]], []).append(s)
+    found = 0
+    for i, batch in enumerate(chunks(sorted(by_id), 30), 1):
+        for t in http.get_json(f"{INAT_API}/taxa/{','.join(batch)}").get("results", []):
+            ph = inat_pick_photo(t, licenses)
+            for s in by_id.get(str(t.get("id")), []):
+                if ph:
+                    s.update(ph); found += 1
+        if i % 10 == 0:
+            log(f"  iNaturalist: {i * 30}/{len(by_id)} Taxa")
+    rest = [s for s in todo if not s.get("img") and s.get("qid") not in ids][:search_limit]
+    for s in rest:                                   # ohne Wikidata-Verknuepfung: Namenssuche, nur exakte Treffer
+        r = http.get_json(f"{INAT_API}/taxa", {"q": s["sciName"], "rank": "species", "is_active": "true", "per_page": 5})
+        t = next((t for t in r.get("results", []) if name_key(t.get("name")) == name_key(s["sciName"])), None)
+        ph = inat_pick_photo(t, licenses) if t else None
+        if ph:
+            s.update(ph); found += 1
+    return found
 
 
 # --------------------------------------------------------------------------- IUCN: Verbreitungskarten (Shapefile)
@@ -1394,7 +1453,8 @@ def merge_species(rows, taxa, gbif=None, update_status=False, add_new=True):
             row, p = rows[i], {}
             if needs_image(row[5]) and s.get("img") and s.get("imgLicense"):
                 row[5] = s["img"]; rep["bilder"] += 1
-                p["img"] = {"source": s.get("imgSource", "wikipedia"), "license": s["imgLicense"], "page": s.get("imgPage", "")}
+                p["img"] = {"source": s.get("imgSource", "wikipedia"), "license": s["imgLicense"], "page": s.get("imgPage", ""),
+                            "artist": s.get("imgArtist", "")}
             if row[6].startswith("?") and fmt_weight(s.get("massG")):
                 row[6] = fmt_weight(s["massG"]); rep["gewichte"] += 1
                 p["weight"] = (s.get("traitSource") or {}).get("massG", "wikidata")
@@ -1433,7 +1493,8 @@ def merge_species(rows, taxa, gbif=None, update_status=False, add_new=True):
             rep["neu"] += 1
             prov[name.replace(" ", "_")] = {"added": date.today().isoformat(), "source": src,
                                             **({"range": "gbif-hull (grobe Naeherung)"} if g.get("range") else {}),
-                                            **({"img": {"source": s.get("imgSource", "wikipedia"), "license": s["imgLicense"], "page": s.get("imgPage", "")}} if img else {})}
+                                            **({"img": {"source": s.get("imgSource", "wikipedia"), "license": s["imgLicense"], "page": s.get("imgPage", ""),
+                                                        "artist": s.get("imgArtist", "")}} if img else {})}
     return rows, rep, prov
 
 
@@ -1517,6 +1578,11 @@ def build_parser():
     x.add_argument("--gbif-max", type=int, default=150)
     x.add_argument("--out", default="crawl/extinct_species.json", help="erst pruefen, dann nach data/ kopieren")
     x.add_argument("--keep", default="data/extinct_species.json", help="handgepflegte Eintraege daraus uebernehmen ('' = keine)")
+
+    nt = sub.add_parser("inat", help="Fotos von iNaturalist fuer Arten ohne Foto")
+    nt.add_argument("--taxa", default="crawl/taxa.json"); nt.add_argument("--data", default="data")
+    nt.add_argument("--allow-nc", action="store_true", help="auch CC BY-NC(-SA) erlauben (nur nichtkommerzielle Nutzung)")
+    nt.add_argument("--search-limit", type=int, default=300, help="hoechstens so viele Namenssuchen fuer Arten ohne Wikidata-ID")
 
     iu = sub.add_parser("iucn", help="Gefaehrdungsursachen aus der IUCN-Roten Liste (Schluessel in IUCN_TOKEN)")
     iu.add_argument("--taxa", default="crawl/taxa.json", help="nur Arten aus dieser Liste (Name oder Synonym)")
@@ -1607,6 +1673,16 @@ def main(argv=None, http=None):
         _save(a.out, {"meta": {"generated": date.today().isoformat(), "count": len(data), "crawler": VERSION,
                                "note": "Jahre, Orte und Ursachen sind Heuristiken. Korrekturen in extinct_overrides.json."},
                       "species": data})
+    elif a.cmd == "inat":
+        taxa = _load(a.taxa)
+        rows = read_species(a.data) if Path(a.data).exists() else []
+        idx = {name_key(r[1]): i for i, r in enumerate(rows)}
+        todo = [s for s in taxa if not s.get("img") and (find_row(idx, s)[0] is None or needs_image(rows[find_row(idx, s)[0]][5]))]
+        print(f"{len(todo)} Arten ohne Foto werden bei iNaturalist gesucht")
+        http.delay = max(http.delay, 1.0)          # iNaturalist bittet um hoechstens etwa 1 Anfrage pro Sekunde
+        n = inat_photos(http, todo, INAT_FREE + (INAT_NC if a.allow_nc else ()), a.search_limit)
+        print(f"{n} Fotos gefunden")
+        _save(a.taxa, taxa)
     elif a.cmd == "iucn":
         token = iucn_token(a.token_file)
         taxa = _load(a.taxa) if Path(a.taxa).exists() else None

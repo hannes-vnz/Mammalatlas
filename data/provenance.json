@@ -443,12 +443,20 @@
   }
  },
  "Peroryctes_broadbentii": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/726517526",
+   "artist": "(c) Chermundy, some rights reserved (CC BY-SA)"
+  }
  },
  "Peroryctes_raffrayanus": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/336389920",
+   "artist": "(c) Jay Pruett, some rights reserved (CC BY), uploaded by Jay Pruett"
+  }
  },
  "Peroryctes_trigonodon": {
   "added": "2026-10-26",
@@ -603,9 +611,12 @@
   }
  },
  "Phalanger_breviceps": {
-  "added": "2026-10-26",
-  "source": "mdd",
-  "range": "gbif-hull (grobe Naeherung)"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC0",
+   "page": "https://www.inaturalist.org/photos/443517241",
+   "artist": "لا توجد حقوق محفوظة, uploaded by Jun MATSUI"
+  }
  },
  "Phalanger_matabiru": {
   "range": "iucn-polygons"
@@ -714,8 +725,12 @@
   "source": "mdd"
  },
  "Lophocebus_osmani": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/262051127",
+   "artist": "(c) Chris Quirin, some rights reserved (CC BY), uploaded by Chris Quirin"
+  }
  },
  "Lophocebus_ugandae": {
   "added": "2026-10-26",
@@ -772,9 +787,12 @@
   "source": "mdd"
  },
  "Homo_sapiens": {
-  "added": "2026-10-26",
-  "source": "mdd",
-  "range": "gbif-hull (grobe Naeherung)"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC0",
+   "page": "https://www.inaturalist.org/photos/80550183",
+   "artist": "no rights reserved, uploaded by Abhas Misraraj"
+  }
  },
  "Nomascus_nasutus": {
   "range": "iucn-polygons"
@@ -1014,8 +1032,12 @@
   "range": "iucn-polygons"
  },
  "Plecturocebus_leucometopus": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/1095068",
+   "artist": "(c) Stephen Davies, some rights reserved (CC BY)"
+  }
  },
  "Chiropotes_utahicki": {
   "added": "2026-10-26",
@@ -1171,8 +1193,12 @@
   "range": "gbif-hull (grobe Naeherung)"
  },
  "Sylvilagus_holzneri": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/380910",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Sylvilagus_hondurensis": {
   "added": "2026-10-26",
@@ -1623,8 +1649,12 @@
   "range": "iucn-polygons"
  },
  "Callosciurus_concolor": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/67021514",
+   "artist": "(c) anukma, some rights reserved (CC BY), uploaded by anukma"
+  }
  },
  "Dremomys_gularis": {
   "range": "iucn-polygons"
@@ -1637,14 +1667,20 @@
   "range": "iucn-polygons"
  },
  "Sundasciurus_altitudinis": {
-  "added": "2026-10-26",
-  "source": "mdd",
-  "range": "gbif-hull (grobe Naeherung)"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/555709590",
+   "artist": "(c) Simon Colenutt, some rights reserved (CC BY), uploaded by Simon Colenutt"
+  }
  },
  "Sundasciurus_everetti": {
-  "added": "2026-10-26",
-  "source": "mdd",
-  "range": "gbif-hull (grobe Naeherung)"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/53877732",
+   "artist": "(c) Jiro Iguchi, some rights reserved (CC BY), uploaded by Jiro Iguchi"
+  }
  },
  "Sundasciurus_jentinki": {
   "range": "iucn-polygons"
@@ -1769,8 +1805,12 @@
   "source": "mdd"
  },
  "Petaurista_hainanus": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/176556072",
+   "artist": "(c) zhangshen, some rights reserved (CC BY), uploaded by zhangshen"
+  }
  },
  "Petaurista_lena": {
   "added": "2026-10-26",
@@ -1829,8 +1869,12 @@
   }
  },
  "Sciurus_nebouxii": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/102944902",
+   "artist": "(c) David F. Belmonte, some rights reserved (CC BY), uploaded by David F. Belmonte"
+  }
  },
  "Sciurus_pachecoi": {
   "added": "2026-10-26",
@@ -1928,9 +1972,12 @@
   "source": "mdd"
  },
  "Neotamias_grisescens": {
-  "added": "2026-10-26",
-  "source": "mdd",
-  "range": "gbif-hull (grobe Naeherung)"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/643300299",
+   "artist": "(c) RJ Baltierra, some rights reserved (CC BY), uploaded by RJ Baltierra"
+  }
  },
  "Neotamias_solivagus": {
   "added": "2026-10-26",
@@ -1992,9 +2039,12 @@
   "range": "gbif-hull (grobe Naeherung)"
  },
  "Heterogeomys_hispidus": {
-  "added": "2026-10-26",
-  "source": "mdd",
-  "range": "gbif-hull (grobe Naeherung)"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/2077346",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Heterogeomys_underwoodi": {
   "added": "2026-10-26",
@@ -2037,12 +2087,20 @@
   "source": "mdd"
  },
  "Megascapheus_ruidosae": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/83242345",
+   "artist": "(c) CK2AZ, some rights reserved (CC BY), uploaded by CK2AZ"
+  }
  },
  "Megascapheus_sheldoni": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/412379",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Megascapheus_townsendii": {
   "added": "2026-10-26",
@@ -2190,8 +2248,12 @@
   }
  },
  "Salpingotus_michaelis": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/285737974",
+   "artist": "(c) awaytrent, some rights reserved (CC BY)"
+  }
  },
  "Salpingotus_thomasi": {
   "added": "2026-10-26",
@@ -2328,8 +2390,12 @@
   "range": "iucn-polygons"
  },
  "Arvicola_persicus": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/243701056",
+   "artist": "(c) Mohammad Amin Ghaffari, some rights reserved (CC BY), uploaded by Mohammad Amin Ghaffari"
+  }
  },
  "Hyperacrius_fertilis": {
   "range": "iucn-polygons"
@@ -2403,9 +2469,12 @@
   "range": "iucn-polygons"
  },
  "Microtus_pyrenaicus": {
-  "added": "2026-10-26",
-  "source": "mdd",
-  "range": "gbif-hull (grobe Naeherung)"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/388003332",
+   "artist": "(c) Dr. Sven Gippner, some rights reserved (CC BY), uploaded by Dr. Sven Gippner"
+  }
  },
  "Microtus_richardsoni": {
   "range": "iucn-polygons"
@@ -2970,8 +3039,12 @@
   "source": "mdd"
  },
  "Castoria_angustidens": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/154058113",
+   "artist": "(c) Victor Farjalla Pontes, some rights reserved (CC BY), uploaded by Victor Farjalla Pontes"
+  }
  },
  "Deltamys_araucaria": {
   "added": "2026-10-26",
@@ -5818,9 +5891,12 @@
   "range": "gbif-hull (grobe Naeherung)"
  },
  "Pteronotus_fulvus": {
-  "added": "2026-10-26",
-  "source": "mdd",
-  "range": "gbif-hull (grobe Naeherung)"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/18656148",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Pteronotus_fuscus": {
   "added": "2026-10-26",
@@ -5831,9 +5907,12 @@
   "range": "iucn-polygons"
  },
  "Pteronotus_mexicanus": {
-  "added": "2026-10-26",
-  "source": "mdd",
-  "range": "gbif-hull (grobe Naeherung)"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/499940523",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Pteronotus_portoricensis": {
   "added": "2026-10-26",
@@ -6066,9 +6145,12 @@
   "range": "gbif-hull (grobe Naeherung)"
  },
  "Uroderma_convexum": {
-  "added": "2026-10-26",
-  "source": "mdd",
-  "range": "gbif-hull (grobe Naeherung)"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/462987064",
+   "artist": "(c) Sylvain Eichhorn, some rights reserved (CC BY), uploaded by Sylvain Eichhorn"
+  }
  },
  "Uroderma_davisi": {
   "added": "2026-10-26",
@@ -7037,9 +7119,12 @@
   "source": "mdd"
  },
  "Tylonycteris_fulvida": {
-  "added": "2026-10-26",
-  "source": "mdd",
-  "range": "gbif-hull (grobe Naeherung)"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/143084141",
+   "artist": "(c) Lawrence Hylton, some rights reserved (CC BY), uploaded by Lawrence Hylton"
+  }
  },
  "Tylonycteris_malayana": {
   "added": "2026-10-26",
@@ -8294,8 +8379,12 @@
   "source": "mdd"
  },
  "Pudella_carlae": {
-  "added": "2026-10-26",
-  "source": "mdd"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/398332511",
+   "artist": "(c) Vector1036, alguns direitos reservados (CC BY-SA)"
+  }
  },
  "Pudella_mephistophiles": {
   "added": "2026-10-26",
@@ -8492,7 +8581,12 @@
   "range": "iucn-polygons"
  },
  "Acomys_spinosissimus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC0",
+   "page": "https://www.inaturalist.org/photos/15183662",
+   "artist": "no rights reserved, uploaded by Andrew Deacon"
+  }
  },
  "Acomys_subspinosus": {
   "range": "iucn-polygons"
@@ -8825,7 +8919,12 @@
   "range": "iucn-polygons"
  },
  "Amblysomus_corriae": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/520351122",
+   "artist": "(c) Christiaan Viljoen, some rights reserved (CC BY), uploaded by Christiaan Viljoen"
+  }
  },
  "Amblysomus_hottentotus": {
   "range": "iucn-polygons"
@@ -8948,7 +9047,12 @@
   "range": "iucn-polygons"
  },
  "Antechinus_godmani": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/181283170",
+   "artist": "(c) Wairambar Rainforest، بعض الحقوق محفوظة (CC BY), uploaded by Wairambar Rainforest"
+  }
  },
  "Antechinus_leo": {
   "range": "iucn-polygons"
@@ -9074,7 +9178,12 @@
   "range": "iucn-polygons"
  },
  "Apomys_camiguinensis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/319491598",
+   "artist": "(c) Larry Heaney, some rights reserved (CC BY-SA)"
+  }
  },
  "Apomys_datae": {
   "range": "iucn-polygons"
@@ -9230,7 +9339,12 @@
   "range": "iucn-polygons"
  },
  "Arvicanthis_abyssinicus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/44440757",
+   "artist": "(c) Forest Botial-Jarvis, sommige rechten voorbehouden (CC BY), geüpload door Forest Botial-Jarvis"
+  }
  },
  "Arvicanthis_ansorgei": {
   "range": "iucn-polygons"
@@ -9335,7 +9449,12 @@
   "range": "iucn-polygons"
  },
  "Avahi_betsileo": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/732685078",
+   "artist": "(c) Chermundy, some rights reserved (CC BY-SA)"
+  }
  },
  "Avahi_cleesei": {
   "range": "iucn-polygons"
@@ -9809,7 +9928,12 @@
   "range": "iucn-polygons"
  },
  "Callosciurus_melanogaster": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC0",
+   "page": "https://www.inaturalist.org/photos/724578228",
+   "artist": "no rights reserved, uploaded by James Eaton"
+  }
  },
  "Callosciurus_nigrovittatus": {
   "range": "iucn-polygons"
@@ -10025,7 +10149,12 @@
   "range": "iucn-polygons"
  },
  "Carpitalpa_arendsi": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/366311393",
+   "artist": "(c) Robert J. Asher, Sarita Maree, Gary Bronner, Nigel C Bennett, Paulette Bloomer, Paul Czechowski, Matthias Meyer & Mi"
+  }
  },
  "Carpomys_melanurus": {
   "range": "iucn-polygons"
@@ -10256,7 +10385,12 @@
   "range": "iucn-polygons"
  },
  "Chaetocauda_sichuanensis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC0",
+   "page": "https://www.inaturalist.org/photos/358962787",
+   "artist": "no rights reserved, uploaded by James Eaton"
+  }
  },
  "Chaetodipus_ammophilus": {
   "range": "iucn-polygons"
@@ -10283,7 +10417,12 @@
   "range": "iucn-polygons"
  },
  "Chaetodipus_goldmani": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/745531995",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Chaetodipus_hispidus": {
   "range": "iucn-polygons"
@@ -10304,7 +10443,12 @@
   "range": "iucn-polygons"
  },
  "Chaetodipus_siccus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/187890059",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Chaetodipus_spinatus": {
   "range": "iucn-polygons"
@@ -10412,7 +10556,12 @@
   "range": "iucn-polygons"
  },
  "Chimarrogale_styani": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/117793006",
+   "artist": "(с) zhangshen, некоторые права защищены (CC BY), загрузил zhangshen"
+  }
  },
  "Chimarrogale_sumatrana": {
   "range": "iucn-polygons"
@@ -10424,7 +10573,12 @@
   "range": "iucn-polygons"
  },
  "Chinchillula_sahamae": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/584267139",
+   "artist": "(c) Unknown author, some rights reserved (CC BY)"
+  }
  },
  "Chingawaemys_rarus": {
   "range": "iucn-polygons"
@@ -10844,7 +10998,12 @@
   "range": "iucn-polygons"
  },
  "Cratogeomys_perotensis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/4691097",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Cratogeomys_planiceps": {
   "range": "iucn-polygons"
@@ -11012,7 +11171,12 @@
   "range": "iucn-polygons"
  },
  "Crocidura_fuscomurina": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/136294400",
+   "artist": "(c) Mahomed Desai, some rights reserved (CC BY), uploaded by Mahomed Desai"
+  }
  },
  "Crocidura_gathornei": {
   "range": "iucn-polygons"
@@ -11147,7 +11311,12 @@
   "range": "iucn-polygons"
  },
  "Crocidura_maxi": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/490406468",
+   "artist": "(c) Donna Belder, some rights reserved (CC BY), uploaded by Donna Belder"
+  }
  },
  "Crocidura_mdumai": {
   "range": "iucn-polygons"
@@ -11474,10 +11643,20 @@
   "range": "iucn-polygons"
  },
  "Cryptonanus_guahybae": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC0",
+   "page": "https://www.inaturalist.org/photos/351740167",
+   "artist": "no rights reserved, uploaded by Fernando Sessegolo"
+  }
  },
  "Cryptonanus_unduaviensis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/725831173",
+   "artist": "(c) Chermundy, some rights reserved (CC BY-SA)"
+  }
  },
  "Cryptotis_aroensis": {
   "range": "iucn-polygons"
@@ -11510,7 +11689,12 @@
   "range": "iucn-polygons"
  },
  "Cryptotis_mayensis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/12490247",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Cryptotis_mccarthyi": {
   "range": "iucn-polygons"
@@ -11540,7 +11724,12 @@
   "range": "iucn-polygons"
  },
  "Cryptotis_squamipes": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/283200587",
+   "artist": "(c) Chermundy, some rights reserved (CC BY-SA)"
+  }
  },
  "Cryptotis_venezuelensis": {
   "range": "iucn-polygons"
@@ -11558,7 +11747,12 @@
   "range": "iucn-polygons"
  },
  "Ctenomys_bergi": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/237804712",
+   "artist": "(c) Tomás Tamagno, some rights reserved (CC BY), uploaded by Tomás Tamagno"
+  }
  },
  "Ctenomys_boliviensis": {
   "range": "iucn-polygons"
@@ -11624,7 +11818,12 @@
   "range": "iucn-polygons"
  },
  "Ctenomys_mendocinus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/48512717",
+   "artist": "(c) Luciano Massa, some rights reserved (CC BY), uploaded by Luciano Massa"
+  }
  },
  "Ctenomys_minutus": {
   "range": "iucn-polygons"
@@ -11642,7 +11841,12 @@
   "range": "iucn-polygons"
  },
  "Ctenomys_perrensi": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/1434429",
+   "artist": "(c) Nicolas Olejnik, some rights reserved (CC BY), uploaded by Nicolas Olejnik"
+  }
  },
  "Ctenomys_peruanus": {
   "range": "iucn-polygons"
@@ -11666,7 +11870,12 @@
   "range": "iucn-polygons"
  },
  "Ctenomys_sociabilis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/424682248",
+   "artist": "(c) Srr013, some rights reserved (CC BY-SA)"
+  }
  },
  "Ctenomys_steinbachi": {
   "range": "iucn-polygons"
@@ -11957,7 +12166,12 @@
   "range": "iucn-polygons"
  },
  "Dendrolagus_pulcherrimus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/161441059",
+   "artist": "(c) [2], some rights reserved (CC BY-SA)"
+  }
  },
  "Dendrolagus_spadix": {
   "range": "iucn-polygons"
@@ -12248,7 +12462,12 @@
   "range": "iucn-polygons"
  },
  "Dorcopsis_atrata": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/725858850",
+   "artist": "(c) Chermundy, some rights reserved (CC BY-SA)"
+  }
  },
  "Dorcopsis_hageni": {
   "range": "iucn-polygons"
@@ -12308,7 +12527,12 @@
   "range": "iucn-polygons"
  },
  "Dyacopterus_brooksi": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/284047245",
+   "artist": "(c) A proietti, some rights reserved (CC BY-SA)"
+  }
  },
  "Dyacopterus_rickarti": {
   "range": "iucn-polygons"
@@ -12371,7 +12595,12 @@
   "range": "iucn-polygons"
  },
  "Elephantulus_fuscipes": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/726985860",
+   "artist": "(c) Chermundy, some rights reserved (CC BY-SA)"
+  }
  },
  "Elephantulus_fuscus": {
   "range": "iucn-polygons"
@@ -12767,7 +12996,12 @@
   "range": "iucn-polygons"
  },
  "Euroscaptor_longirostris": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/602758857",
+   "artist": "(c) Laura Flamme, some rights reserved (CC BY)"
+  }
  },
  "Euroscaptor_parvidens": {
   "range": "iucn-polygons"
@@ -12779,7 +13013,12 @@
   "range": "iucn-polygons"
  },
  "Euryoryzomys_lamia": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/106979158",
+   "artist": "(c) Mario Barroso, alguns direitos reservados (CC BY), carregado por Mario Barroso"
+  }
  },
  "Euryoryzomys_legatus": {
   "range": "iucn-polygons"
@@ -13085,7 +13324,12 @@
   "range": "iucn-polygons"
  },
  "Geomys_tropicalis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/588173513",
+   "artist": "(с) Bruno Frías Morales, некоторые права защищены (CC BY), загрузил Bruno Frías Morales"
+  }
  },
  "Georychus_capensis": {
   "range": "iucn-polygons"
@@ -13169,7 +13413,12 @@
   "range": "iucn-polygons"
  },
  "Gerbillus_floweri": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/3974036",
+   "artist": "(c) XV8-Crisis, some rights reserved (CC BY-SA)"
+  }
  },
  "Gerbillus_gerbillus": {
   "range": "iucn-polygons"
@@ -13814,7 +14063,12 @@
   "range": "iucn-polygons"
  },
  "Hipposideros_lylei": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/3349585",
+   "artist": "(c) Julien Renoult, some rights reserved (CC BY), uploaded by Julien Renoult"
+  }
  },
  "Hipposideros_macrobullatus": {
   "range": "iucn-polygons"
@@ -14297,7 +14551,12 @@
   "range": "iucn-polygons"
  },
  "Juliomys_rimofrons": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/47262227",
+   "artist": "(c) Diogo Luiz, some rights reserved (CC BY), uploaded by Diogo Luiz"
+  }
  },
  "Juscelinomys_huanchacae": {
   "range": "iucn-polygons"
@@ -14480,7 +14739,12 @@
   "range": "iucn-polygons"
  },
  "Lariscus_niobe": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "wikipedia",
+   "license": "CC BY 4.0",
+   "page": "https://commons.wikimedia.org/wiki/File:Lariscus_niobe.jpg",
+   "artist": "Simon Colenutt"
+  }
  },
  "Lariscus_obscurus": {
   "range": "iucn-polygons"
@@ -15053,7 +15317,12 @@
   "range": "iucn-polygons"
  },
  "Lutreolina_massoia": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/176517477",
+   "artist": "(c) Gonzalo Martinez، بعض الحقوق محفوظة (CC BY), uploaded by Gonzalo Martinez"
+  }
  },
  "Lycalopex_culpaeus": {
   "range": "iucn-polygons"
@@ -15092,7 +15361,12 @@
   "range": "iucn-polygons"
  },
  "Macaca_brunnescens": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/128760803",
+   "artist": "(c) ꦥꦤ꧀ꦗꦶꦒꦸꦱ꧀ꦠꦶꦄꦏ꧀ꦧꦂ, some rights reserved (CC BY), uploaded by ꦥꦤ꧀ꦗꦶꦒꦸꦱ꧀ꦠꦶꦄꦏ꧀ꦧꦂ"
+  }
  },
  "Macaca_cyclopis": {
   "range": "iucn-polygons"
@@ -15356,7 +15630,12 @@
   "range": "iucn-polygons"
  },
  "Marmosops_ocellatus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/202808101",
+   "artist": "(c) Michael A. Alcorn, some rights reserved (CC BY)"
+  }
  },
  "Marmosops_pakaraimae": {
   "range": "iucn-polygons"
@@ -15932,22 +16211,42 @@
   "range": "iucn-polygons"
  },
  "Microperoryctes_aplini": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/726511661",
+   "artist": "(c) Chermundy, some rights reserved (CC BY-SA)"
+  }
  },
  "Microperoryctes_longicauda": {
   "range": "iucn-polygons"
  },
  "Microperoryctes_murinus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/726511944",
+   "artist": "(c) Chermundy، بعض الحقوق محفوظة (CC BY-SA)"
+  }
  },
  "Microperoryctes_papuensis": {
   "range": "iucn-polygons"
  },
  "Micropotamogale_lamottei": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/366311952",
+   "artist": "(c) Photo: © A. Monadjem, some rights reserved (CC BY-SA)"
+  }
  },
  "Micropotamogale_ruwenzorii": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/366312082",
+   "artist": "(c) Unknown author, some rights reserved (CC BY-SA)"
+  }
  },
  "Microryzomys_minutus": {
   "range": "iucn-polygons"
@@ -15995,7 +16294,12 @@
   "range": "iucn-polygons"
  },
  "Microtus_daghestanicus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/23357958",
+   "artist": "(c) Andre Hosper, bazı hakları saklıdır (CC BY), yükleyen: Andre Hosper"
+  }
  },
  "Microtus_dogramacii": {
   "range": "iucn-polygons"
@@ -16016,7 +16320,12 @@
   "range": "iucn-polygons"
  },
  "Microtus_irani": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/430766750",
+   "artist": "(c) Internet Archive Book Images, bazı hakları saklıdır (CC BY)"
+  }
  },
  "Microtus_kermanensis": {
   "range": "iucn-polygons"
@@ -16049,7 +16358,12 @@
   "range": "iucn-polygons"
  },
  "Microtus_oaxacensis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/3167489",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Microtus_obscurus": {
   "range": "iucn-polygons"
@@ -16118,7 +16432,12 @@
   "range": "iucn-polygons"
  },
  "Millardia_meltada": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/480375916",
+   "artist": "(c) Jan Ebr & Ivana Ebrová, some rights reserved (CC BY), uploaded by Jan Ebr & Ivana Ebrová"
+  }
  },
  "Mimetillus_moloneyi": {
   "range": "iucn-polygons"
@@ -16565,7 +16884,12 @@
   "range": "iucn-polygons"
  },
  "Murexia_rothschildi": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/366215028",
+   "artist": "(c) Tate, 1938، بعض الحقوق محفوظة (CC BY)"
+  }
  },
  "Murina_aenea": {
   "range": "iucn-polygons"
@@ -16715,7 +17039,12 @@
   "range": "iucn-polygons"
  },
  "Mus_neavei": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC0",
+   "page": "https://www.inaturalist.org/photos/12958642",
+   "artist": "no rights reserved, uploaded by Simon Tonge"
+  }
  },
  "Mus_oubanguii": {
   "range": "iucn-polygons"
@@ -17048,7 +17377,12 @@
   "range": "iucn-polygons"
  },
  "Myotis_findleyi": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/3698740",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Myotis_formosus": {
   "range": "iucn-polygons"
@@ -17165,7 +17499,12 @@
   "range": "iucn-polygons"
  },
  "Myotis_pilosus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/13019764",
+   "artist": "(c) Dan Riskin, some rights reserved (CC BY), uploaded by Dan Riskin"
+  }
  },
  "Myotis_planiceps": {
   "range": "iucn-polygons"
@@ -17753,7 +18092,12 @@
   "range": "iucn-polygons"
  },
  "Niviventer_lepturus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC0",
+   "page": "https://www.inaturalist.org/photos/280911972",
+   "artist": "no rights reserved, uploaded by Fajar Alfitrian"
+  }
  },
  "Niviventer_niviventer": {
   "range": "iucn-polygons"
@@ -17816,7 +18160,12 @@
   "range": "iucn-polygons"
  },
  "Notiosorex_evotis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/3894668",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Notocitellus_adocetus": {
   "range": "iucn-polygons"
@@ -17939,7 +18288,12 @@
   "range": "iucn-polygons"
  },
  "Nycticeius_cubanus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/172610972",
+   "artist": "(c) Dayron Breto, algunos derechos reservados (CC BY), subido por Dayron Breto"
+  }
  },
  "Nycticeius_humeralis": {
   "range": "iucn-polygons"
@@ -18080,7 +18434,12 @@
   "range": "iucn-polygons"
  },
  "Ochotona_iliensis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/64209045",
+   "artist": "(c) Chermundy, some rights reserved (CC BY-SA)"
+  }
  },
  "Ochotona_koslowi": {
   "range": "iucn-polygons"
@@ -18122,7 +18481,12 @@
   "range": "iucn-polygons"
  },
  "Ochotona_thomasi": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/727610995",
+   "artist": "(c) Chermundy, some rights reserved (CC BY-SA)"
+  }
  },
  "Ochotona_turuchanensis": {
   "range": "iucn-polygons"
@@ -18248,10 +18612,20 @@
   "range": "iucn-polygons"
  },
  "Oligoryzomys_rupestris": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/724082045",
+   "artist": "(c) Francisco V. Bezerra Neto, some rights reserved (CC BY-SA), uploaded by Francisco V. Bezerra Neto"
+  }
  },
  "Oligoryzomys_stramineus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/478764201",
+   "artist": "(c) Thomaz de Carvalho Callado, some rights reserved (CC BY), uploaded by Thomaz de Carvalho Callado"
+  }
  },
  "Oligoryzomys_vegetus": {
   "range": "iucn-polygons"
@@ -18326,7 +18700,12 @@
   "range": "iucn-polygons"
  },
  "Oryzorictes_tetradactylus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/726608451",
+   "artist": "(c) Laura Flamme, some rights reserved (CC BY)"
+  }
  },
  "Osgoodomys_banderanus": {
   "range": "iucn-polygons"
@@ -18383,7 +18762,12 @@
   "range": "iucn-polygons"
  },
  "Otomys_angoniensis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/15506720",
+   "artist": "(c) Ryan van Huyssteen, some rights reserved (CC BY), uploaded by Ryan van Huyssteen"
+  }
  },
  "Otomys_auratus": {
   "range": "iucn-polygons"
@@ -18782,7 +19166,12 @@
   "range": "iucn-polygons"
  },
  "Pelomys_fallax": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/295242610",
+   "artist": "(c) Mahomed Desai, some rights reserved (CC BY), uploaded by Mahomed Desai"
+  }
  },
  "Pelomys_hopkinsi": {
   "range": "iucn-polygons"
@@ -18851,7 +19240,12 @@
   "range": "iucn-polygons"
  },
  "Peromyscus_beatae": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/59767718",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Peromyscus_bullatus": {
   "range": "iucn-polygons"
@@ -18887,7 +19281,12 @@
   "range": "iucn-polygons"
  },
  "Peromyscus_gratus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/433723",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Peromyscus_guatemalensis": {
   "range": "iucn-polygons"
@@ -18899,7 +19298,12 @@
   "range": "iucn-polygons"
  },
  "Peromyscus_hylocetes": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/59579717",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Peromyscus_leucopus": {
   "range": "iucn-polygons"
@@ -18944,7 +19348,12 @@
   "range": "iucn-polygons"
  },
  "Peromyscus_perfulvus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/4617785",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Peromyscus_polionotus": {
   "range": "iucn-polygons"
@@ -18980,13 +19389,23 @@
   "range": "iucn-polygons"
  },
  "Peromyscus_zarhynchus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/629866070",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Peropteryx_kappleri": {
   "range": "iucn-polygons"
  },
  "Peropteryx_leucoptera": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC0",
+   "page": "https://www.inaturalist.org/photos/531454454",
+   "artist": "no rights reserved, uploaded by Carlos Henrique Russi"
+  }
  },
  "Peropteryx_macrotis": {
   "range": "iucn-polygons"
@@ -19058,7 +19477,12 @@
   "range": "iucn-polygons"
  },
  "Petinomys_mindanensis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/13306977",
+   "artist": "(c) Forest Botial-Jarvis, some rights reserved (CC BY), uploaded by Forest Botial-Jarvis"
+  }
  },
  "Petinomys_setosus": {
   "range": "iucn-polygons"
@@ -19184,7 +19608,12 @@
   "range": "iucn-polygons"
  },
  "Pharotis_imogene": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/583504610",
+   "artist": "(c) DeadMonkey8984, some rights reserved (CC BY-SA)"
+  }
  },
  "Phascogale_tapoatafa": {
   "range": "iucn-polygons"
@@ -19925,7 +20354,12 @@
   "range": "iucn-polygons"
  },
  "Proechimys_chrysaeolus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/462993503",
+   "artist": "(c) Sylvain Eichhorn, some rights reserved (CC BY), uploaded by Sylvain Eichhorn"
+  }
  },
  "Proechimys_cuvieri": {
   "range": "iucn-polygons"
@@ -19937,7 +20371,12 @@
   "range": "iucn-polygons"
  },
  "Proechimys_gardneri": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/11487865",
+   "artist": "(c) Vincent A. Vos, some rights reserved (CC BY), uploaded by Vincent A. Vos"
+  }
  },
  "Proechimys_goeldii": {
   "range": "iucn-polygons"
@@ -19967,10 +20406,20 @@
   "range": "iucn-polygons"
  },
  "Proechimys_quadruplicatus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/623552865",
+   "artist": "(c) Tom Field, some rights reserved (CC BY), uploaded by Tom Field"
+  }
  },
  "Proechimys_roberti": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/348533999",
+   "artist": "(c) Guilherme Siniciato Terra Garbino, some rights reserved (CC BY), uploaded by Guilherme Siniciato Terra Garbino"
+  }
  },
  "Proechimys_semispinosus": {
   "range": "iucn-polygons"
@@ -19979,7 +20428,12 @@
   "range": "iucn-polygons"
  },
  "Proechimys_steerei": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/489988335",
+   "artist": "(c) Joe crutwell, some rights reserved (CC BY), uploaded by Joe crutwell"
+  }
  },
  "Proechimys_trinitatis": {
   "range": "iucn-polygons"
@@ -20555,10 +21009,20 @@
   "range": "iucn-polygons"
  },
  "Rattus_koopmani": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/722503243",
+   "artist": "(c) rjtizard, some rights reserved (CC BY)"
+  }
  },
  "Rattus_korinchi": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC0",
+   "page": "https://www.inaturalist.org/photos/350435695",
+   "artist": "no rights reserved, uploaded by James Eaton"
+  }
  },
  "Rattus_leucopus": {
   "range": "iucn-polygons"
@@ -20573,7 +21037,12 @@
   "range": "iucn-polygons"
  },
  "Rattus_montanus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC0",
+   "page": "https://www.inaturalist.org/photos/449100821",
+   "artist": "no rights reserved, uploaded by Stuart"
+  }
  },
  "Rattus_mordax": {
   "range": "iucn-polygons"
@@ -20693,7 +21162,12 @@
   "range": "iucn-polygons"
  },
  "Reithrodontomys_brevirostris": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/22465717",
+   "artist": "(c) John G. Phillips, some rights reserved (CC BY), uploaded by John G. Phillips"
+  }
  },
  "Reithrodontomys_burti": {
   "range": "iucn-polygons"
@@ -20756,7 +21230,12 @@
   "range": "iucn-polygons"
  },
  "Rhabdomys_intermedius": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/220169080",
+   "artist": "(c) Alan Manson, some rights reserved (CC BY), uploaded by Alan Manson"
+  }
  },
  "Rhabdomys_pumilio": {
   "range": "iucn-polygons"
@@ -21110,7 +21589,12 @@
   "range": "iucn-polygons"
  },
  "Rhipidomys_nitela": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/462546583",
+   "artist": "(c) Jan Ebr & Ivana Ebrová, some rights reserved (CC BY), uploaded by Jan Ebr & Ivana Ebrová"
+  }
  },
  "Rhipidomys_ochrogaster": {
   "range": "iucn-polygons"
@@ -21695,7 +22179,12 @@
   "range": "iucn-polygons"
  },
  "Sigmodon_leucotis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/47988903",
+   "artist": "(c) Oscar Alejandro Morales Juárez, some rights reserved (CC BY-SA), uploaded by Oscar Alejandro Morales Juárez"
+  }
  },
  "Sigmodon_mascotensis": {
   "range": "iucn-polygons"
@@ -21866,7 +22355,12 @@
   "range": "iucn-polygons"
  },
  "Sorex_leucogaster": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/558590568",
+   "artist": "(c) Pavel Smirnov, some rights reserved (CC BY), uploaded by Pavel Smirnov"
+  }
  },
  "Sorex_longirostris": {
   "range": "iucn-polygons"
@@ -22217,7 +22711,12 @@
   "range": "iucn-polygons"
  },
  "Sturnira_nana": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/120831757",
+   "artist": "(c) A proietti, some rights reserved (CC BY-SA)"
+  }
  },
  "Sturnira_oporaphilum": {
   "range": "iucn-polygons"
@@ -22232,7 +22731,12 @@
   "range": "iucn-polygons"
  },
  "Sturnira_sorianoi": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/120832511",
+   "artist": "(c) A proietti, some rights reserved (CC BY-SA)"
+  }
  },
  "Sturnira_tildae": {
   "range": "iucn-polygons"
@@ -22253,7 +22757,12 @@
   "range": "iucn-polygons"
  },
  "Suncus_dayi": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/430827379",
+   "artist": "(c) Siva Naturewild, some rights reserved (CC BY), uploaded by Siva Naturewild"
+  }
  },
  "Suncus_etruscus": {
   "range": "iucn-polygons"
@@ -22274,7 +22783,12 @@
   "range": "iucn-polygons"
  },
  "Suncus_malayanus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/102969563",
+   "artist": "(c) Utain Pummarin, some rights reserved (CC BY), uploaded by Utain Pummarin"
+  }
  },
  "Suncus_mertensi": {
   "range": "iucn-polygons"
@@ -22364,7 +22878,12 @@
   "range": "iucn-polygons"
  },
  "Sus_oliveri": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/322724007",
+   "artist": "(c) PhnomPencil, some rights reserved (CC BY-SA)"
+  }
  },
  "Sus_philippensis": {
   "range": "iucn-polygons"
@@ -22412,7 +22931,12 @@
   "range": "iucn-polygons"
  },
  "Sylvilagus_tapetillus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/727539828",
+   "artist": "(c) Unknown author, some rights reserved (CC BY)"
+  }
  },
  "Sylvilagus_transitionalis": {
   "range": "iucn-polygons"
@@ -22532,7 +23056,12 @@
   "range": "iucn-polygons"
  },
  "Talpa_davidiana": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/620996754",
+   "artist": "(c) Laura Flamme, some rights reserved (CC BY)"
+  }
  },
  "Talpa_europaea": {
   "range": "iucn-polygons"
@@ -22739,7 +23268,12 @@
   "range": "iucn-polygons"
  },
  "Thalpomys_lasiotis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/743845682",
+   "artist": "(c) Claudio Martins de Souza, some rights reserved (CC BY-SA), uploaded by Claudio Martins de Souza"
+  }
  },
  "Thamnomys_kempi": {
   "range": "iucn-polygons"
@@ -22910,7 +23444,12 @@
   "range": "iucn-polygons"
  },
  "Thrichomys_pachyurus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/661134924",
+   "artist": "(c) Lucas Mantelo Cruz, some rights reserved (CC BY), uploaded by Lucas Mantelo Cruz"
+  }
  },
  "Thryonomys_gregorianus": {
   "range": "iucn-polygons"
@@ -23138,7 +23677,12 @@
   "range": "iucn-polygons"
  },
  "Trinomys_gratiosus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/109034904",
+   "artist": "(c) Pedro Henrique Maloso Ramos, some rights reserved (CC BY), uploaded by Pedro Henrique Maloso Ramos"
+  }
  },
  "Trinomys_iheringi": {
   "range": "iucn-polygons"
@@ -23210,7 +23754,12 @@
   "range": "iucn-polygons"
  },
  "Tupaia_palawanensis": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/599057142",
+   "artist": "(c) Ben Jobson, some rights reserved (CC BY), uploaded by Ben Jobson"
+  }
  },
  "Tupaia_picta": {
   "range": "iucn-polygons"
@@ -23546,7 +24095,12 @@
   "range": "iucn-polygons"
  },
  "Xeronycteris_vieirai": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY",
+   "page": "https://www.inaturalist.org/photos/472005952",
+   "artist": "(c) Antonio Nonato, some rights reserved (CC BY), uploaded by Antonio Nonato"
+  }
  },
  "Xerospermophilus_mohavensis": {
   "range": "iucn-polygons"
@@ -23600,7 +24154,12 @@
   "range": "iucn-polygons"
  },
  "Zygogeomys_trichopus": {
-  "range": "iucn-polygons"
+  "img": {
+   "source": "inaturalist",
+   "license": "CC BY-SA",
+   "page": "https://www.inaturalist.org/photos/4644787",
+   "artist": "(c) Juan Cruzado Cortés, some rights reserved (CC BY-SA), uploaded by Juan Cruzado Cortés"
+  }
  },
  "Zyzomys_argurus": {
   "range": "iucn-polygons"

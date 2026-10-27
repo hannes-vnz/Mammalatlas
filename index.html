@@ -971,7 +971,14 @@ function showSpeciesDetail(sp) {
   const orderName = sp.order ? sp.order.toUpperCase() : "";
   const readableOrder = TAXONOMY_LABELS[orderName] ? `${sp.order} (${TAXONOMY_LABELS[orderName]})` : (sp.order || "Unbekannt");
   const photo = isPhoto(sp.image_url);
-  const credit = photo ? commonsPage(sp.image_url) : null;
+  // Bildnachweis: Herkunft aus provenance.json (Wikipedia/Commons, Wikidata oder iNaturalist), sonst aus der Commons-URL
+  const pimg = (PROV[sp.sciName.replace(/ /g, "_")] || {}).img;
+  const srcName = { inaturalist: "iNaturalist", wikidata: "Wikimedia Commons", wikipedia: "Wikimedia Commons" };
+  const credit = !photo ? null : pimg && pimg.page
+    ? { href: pimg.page, text: `Bild: ${srcName[pimg.source] || "Wikimedia Commons"}`
+        + (pimg.license && !(pimg.artist || "").includes(pimg.license) ? " · " + pimg.license : "")   // iNaturalist nennt die Lizenz schon im Urheber
+        + (pimg.artist ? " · " + pimg.artist : "") }
+    : commonsPage(sp.image_url) ? { href: commonsPage(sp.image_url), text: "Bild: Wikimedia Commons (Lizenz & Urheber)" } : null;
 
   const cells = [];
   if (known(sp.weight)) cells.push(`<div class="info-cell"><div class="label">Gewicht</div><div class="value">${esc(sp.weight)}</div></div>`);
@@ -979,7 +986,7 @@ function showSpeciesDetail(sp) {
 
   el.innerHTML = `
     <div class="hero-image" id="hero-image"></div>
-    ${credit ? `<div class="img-credit"><a href="${esc(credit)}" target="_blank" rel="noopener">Bild: Wikimedia Commons (Lizenz &amp; Urheber)</a></div>` : ""}
+    ${credit ? `<div class="img-credit"><a href="${esc(credit.href)}" target="_blank" rel="noopener">${esc(credit.text)}</a></div>` : ""}
     <div class="detail-content">
       <div class="common">${esc(sp.common || "Unbekannt")}</div>
       <div class="scientific">${esc(sp.sciName)}</div>

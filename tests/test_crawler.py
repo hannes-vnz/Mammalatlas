@@ -553,3 +553,25 @@ def test_ungueltige_flaeche_wird_repariert():
     bowtie = Polygon([(0, 0), (2, 2), (2, 0), (0, 2), (0, 0)])        # Selbstueberschneidung
     out = c._shape_to_range(bowtie, 2)
     assert out and all(Polygon([tuple(map(float, p.split("|"))) for p in part.split(";")]).is_valid for part in out.split("*"))
+
+
+# ------------------------------------------------------------------ iNaturalist
+def test_inat_fotos_nur_freie_lizenzen():
+    Q = "http://www.wikidata.org/entity/"
+    taxa_resp = {"results": [
+        {"id": 41, "name": "Aaa bbb", "default_photo": {"id": 1, "license_code": None, "medium_url": "https://x/1.jpg"},
+         "taxon_photos": [{"photo": {"id": 2, "license_code": "cc-by", "medium_url": "https://x/2.jpg", "attribution": "(c) Jane, some rights reserved (CC BY)"}}]},
+        {"id": 42, "name": "Ccc ddd", "default_photo": {"id": 3, "license_code": "cc-by-nc", "medium_url": "https://x/3.jpg"}}]}
+    http = Fake([(sparql_has("wdt:P3151"), sparql_result([B(item=Q + "Q1", inat="41"), B(item=Q + "Q2", inat="42")])),
+                 (lambda u, p: u.endswith("/taxa/41,42"), taxa_resp),
+                 (lambda u, p: u.endswith("/taxa") and p.get("q") == "Eee fff", {"results": [{"name": "Eee fffi"}, {"name": "Eee fff", "default_photo": {"id": 9, "license_code": "cc0", "medium_url": "https://x/9.jpg"}}]})])
+    sp = [{"qid": "Q1", "sciName": "Aaa bbb"}, {"qid": "Q2", "sciName": "Ccc ddd"}, {"qid": None, "sciName": "Eee fff"},
+          {"qid": "Q3", "sciName": "Mit Bild", "img": "https://schon/da.jpg"}]
+    assert c.inat_photos(http, sp, log=lambda *a: None) == 2
+    assert sp[0]["img"] == "https://x/2.jpg" and sp[0]["imgLicense"] == "CC BY" and sp[0]["imgPage"].endswith("/photos/2")
+    assert sp[0]["imgSource"] == "inaturalist" and sp[0]["imgArtist"].startswith("(c) Jane")
+    assert "img" not in sp[1]                                             # CC BY-NC ohne --allow-nc nicht
+    assert sp[2]["img"] == "https://x/9.jpg" and sp[2]["imgLicense"] == "CC0" and sp[3]["img"] == "https://schon/da.jpg"
+    sp[1].pop("img", None)
+    http2 = Fake([(sparql_has("wdt:P3151"), sparql_result([B(item=Q + "Q2", inat="42")])), (lambda u, p: u.endswith("/taxa/42"), taxa_resp)])
+    assert c.inat_photos(http2, [sp[1]], c.INAT_FREE + c.INAT_NC, log=lambda *a: None) == 1 and sp[1]["imgLicense"] == "CC BY-NC"

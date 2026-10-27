@@ -20,6 +20,7 @@ CONTACT="you@example.com"                      # Wikimedia and GBIF expect a con
 python tools/crawler.py --contact $CONTACT mdd                        # all species from MDD/ (CSV from mammaldiversity.org) + Wikidata ids
 # or: python tools/crawler.py --contact $CONTACT taxa                 # only Wikidata species with an IUCN entry
 python tools/crawler.py --contact $CONTACT enrich                     # photos, licences, texts (only where missing)
+python tools/crawler.py --contact $CONTACT inat --allow-nc               # iNaturalist photos for species still without one (see Licences)
 python tools/crawler.py traits --anage anage_data.txt --pantheria PanTHERIA_1-0_WR05_Aug2008.txt   # optional
 python tools/crawler.py --contact $CONTACT gbif --max-species 300     # rough ranges for species without a polygon
 python tools/crawler.py --contact $CONTACT extinct                    # crawl/extinct_species.json (check, then copy to data/)
@@ -47,7 +48,7 @@ Put the MDD download in `MDD/` (ignored by git, the synonym file alone is 68 MB)
 
 ## Licences
 
-Wikipedia text is CC BY-SA, images carry the licence stored per species, GBIF records are CC0 or CC BY per dataset. Keep the attribution when you publish the data. Check the licence of AnAge, PanTHERIA and COMBINE before redistributing values taken from them.
+Wikipedia text is CC BY-SA, images carry the licence stored per species (iNaturalist photos partly CC BY-NC: fine for this non-commercial site, remove them before any commercial use), GBIF records are CC0 or CC BY per dataset. Keep the attribution when you publish the data. Check the licence of AnAge, PanTHERIA and COMBINE before redistributing values taken from them.
 
 ## Tests
 
